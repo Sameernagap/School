@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       server_url:
-        description: 'School server address the app starts with'
+        description: "School server address the app starts with"
         required: true
-        default: 'http://192.168.1.25:8069'
+        default: "http://192.168.1.25:8069"
   push:
     branches: [main]
 
@@ -14,14 +14,17 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Get the code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Install Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
-      - uses: subosito/flutter-action@v2
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
@@ -32,13 +35,15 @@ jobs:
       - name: Get packages
         run: flutter pub get
 
-      - name: Build APK (debug build: allows http:// to a local Odoo)
+      - name: Build debug APK
+        env:
+          SERVER_URL: ${{ github.event.inputs.server_url }}
         run: |
-          URL="${{ github.event.inputs.server_url }}"
-          if [ -z "$URL" ]; then URL="http://192.168.1.25:8069"; fi
-          flutter build apk --debug --dart-define=API_BASE_URL=$URL
+          URL="${SERVER_URL:-http://192.168.1.25:8069}"
+          flutter build apk --debug --dart-define=API_BASE_URL="$URL"
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: school-app-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
