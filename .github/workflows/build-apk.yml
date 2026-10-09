@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: 'School server address the app starts with'
+        required: true
+        default: 'http://192.168.1.25:8069'
+  push:
+    branches: [main]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create Android platform folder
+        run: flutter create --org com.bingoforge --project-name school_app --platforms android .
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Build APK (debug build: allows http:// to a local Odoo)
+        run: |
+          URL="${{ github.event.inputs.server_url }}"
+          if [ -z "$URL" ]; then URL="http://192.168.1.25:8069"; fi
+          flutter build apk --debug --dart-define=API_BASE_URL=$URL
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: school-app-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
