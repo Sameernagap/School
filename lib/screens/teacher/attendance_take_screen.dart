@@ -44,9 +44,9 @@ class _AttendanceTakeScreenState extends State<AttendanceTakeScreen> {
   Future<void> _loadSections() async {
     try {
       final data = await _api.get('/teacher/sections');
-      _sections = (data as List).cast<Map>();
-      final mine = _sections.where((s) => s['is_class_teacher'] == true).toList();
-      _sectionId = (mine.isNotEmpty ? mine.first : (_sections.isNotEmpty ? _sections.first : null))?['id'] as int?;
+      // Daily attendance is taken by the class teacher only.
+      _sections = (data as List).cast<Map>().where((s) => s['is_class_teacher'] == true).toList();
+      _sectionId = _sections.isNotEmpty ? _sections.first['id'] as int? : null;
       if (_sectionId != null) {
         await _openSheet();
       }
@@ -153,6 +153,13 @@ class _AttendanceTakeScreenState extends State<AttendanceTakeScreen> {
           ),
           if (_loading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (_sections.isEmpty)
+            const Expanded(
+              child: EmptyView(
+                icon: Icons.groups_outlined,
+                message: 'Daily attendance is taken by the class teacher.\nYou are not the class teacher of any section.',
+              ),
+            )
           else if (_error != null)
             Expanded(child: ErrorView(message: _error!, onRetry: _openSheet))
           else if (_sheet == null)
