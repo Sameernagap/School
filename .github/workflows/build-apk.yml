@@ -32,6 +32,36 @@ jobs:
       - name: Create Android platform folder
         run: flutter create --org com.bingoforge --project-name school_app --platforms android .
 
+      # Push notifications: paste the content of google-services.json (Firebase console) into the
+      # repository secret GOOGLE_SERVICES_JSON. Without the secret the app is built without push.
+      - name: Add Firebase (push notifications)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          grep -q POST_NOTIFICATIONS "$MANIFEST" || sed -i 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#&\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>#' "$MANIFEST"
+          # Firebase needs Android 6.0 (API 23) or newer
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = maxOf(flutter.minSdkVersion, 23)/' android/app/build.gradle.kts
+          else
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion Math.max(flutter.minSdkVersion, 23)/' android/app/build.gradle
+          fi
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::GOOGLE_SERVICES_JSON secret is not set - building without push notifications"
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          grep -q '"package_name": "com.bingoforge.school_app"' android/app/google-services.json \
+            || { echo "::error::google-services.json has no Android app com.bingoforge.school_app"; exit 1; }
+          if [ -f android/settings.gradle.kts ]; then
+            sed -i 's#id("dev.flutter.flutter-plugin-loader") version "1.0.0"#&\n    id("com.google.gms.google-services") version "4.4.2" apply false#' android/settings.gradle.kts
+            sed -i 's#id("dev.flutter.flutter-gradle-plugin")#&\n    id("com.google.gms.google-services")#' android/app/build.gradle.kts
+          else
+            sed -i 's#id "dev.flutter.flutter-plugin-loader" version "1.0.0"#&\n    id "com.google.gms.google-services" version "4.4.2" apply false#' android/settings.gradle
+            sed -i 's#id "dev.flutter.flutter-gradle-plugin"#&\n    id "com.google.gms.google-services"#' android/app/build.gradle
+          fi
+          grep -n "google-services\|minSdk" android/settings.gradle* android/app/build.gradle*
+
       - name: Get packages
         run: flutter pub get
 
