@@ -2,19 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'config.dart';
+import 'push/push_service.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final state = AppState();
+  await PushService.instance.init(state);
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState()..init(),
+    ChangeNotifierProvider.value(
+      value: state,
       child: const SchoolApp(),
     ),
   );
+  state.init();
 }
 
 class SchoolApp extends StatelessWidget {
@@ -25,6 +29,8 @@ class SchoolApp extends StatelessWidget {
     return MaterialApp(
       title: appName,
       debugShowCheckedModeBanner: false,
+      navigatorKey: PushService.instance.navigatorKey,
+      scaffoldMessengerKey: PushService.instance.messengerKey,
       theme: buildTheme(),
       home: const _Root(),
     );

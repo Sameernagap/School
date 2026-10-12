@@ -18,7 +18,7 @@ Needs Flutter 3.22 or newer (`flutter --version`).
 
 ```bash
 unzip school_app.zip && cd school_app
-flutter create --org com.bingoforge --project-name school_app --platforms android,ios .
+flutter create --org com.sameer --project-name school_app --platforms android,ios .
 flutter pub get
 ```
 
@@ -79,6 +79,7 @@ lib/
   theme.dart                colours (same as the Odoo back office), status colours
   api/api_client.dart       /api/v1 client: bearer token, JSON, friendly errors, file downloads
   state/app_state.dart      session, /me, selected child, family/teacher mode (Provider)
+  push/push_service.dart    Firebase push: register phone, banner when open, tap opens screen
   utils/format.dart         dates, money formatting, initials
   widgets/common.dart       cards, chips, loaders, error/empty views, open PDF / pay link
   screens/
@@ -97,42 +98,25 @@ lib/
 The token is kept in the phone's secure storage (Keychain / Android Keystore). When the server
 answers 401 (expired or signed out by the admin), the app returns to the login screen.
 
-## 4. Push notifications (Firebase) – when you are ready
+## 4. Push notifications (Firebase)
 
-The app already shows every notification in the **Inbox**. To also get them as phone
-notifications:
+Push is built in. Every Inbox notification (notice, homework, absence, leave, exam result, fees,
+library, school bus) also appears in the phone's notification panel; tapping it opens the right
+screen. With the app open, a banner shows at the bottom instead.
 
-1. Create a Firebase project, add an Android app (`com.bingoforge.school_app`) and an iOS app.
-2. `dart pub global activate flutterfire_cli` then `flutterfire configure` in this folder
-   (creates `lib/firebase_options.dart` and the platform files).
-3. `flutter pub add firebase_core firebase_messaging`
-4. In `lib/main.dart`:
+1. Firebase console › create a project › add an **Android app** with package name
+   `com.sameer.school_app` › download **google-services.json**.
+2. GitHub repository › Settings › Secrets and variables › Actions › **New repository secret**
+   named `GOOGLE_SERVICES_JSON`, value = the whole content of google-services.json.
+   The build workflow adds Firebase only when this secret exists.
+3. Firebase console › Project settings › Service accounts › **Generate new private key** (JSON).
+4. Odoo › Settings › School › Mobile App › tick **Push notifications**, enter the **Firebase
+   project ID** and paste the private key JSON › Save.
+5. Build the APK again (Actions › Build Android APK › Run workflow), install it, sign in and allow
+   notifications.
 
-```dart
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'firebase_options.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  final state = AppState();
-  runApp(ChangeNotifierProvider.value(value: state, child: const SchoolApp()));
-  await state.init();
-  final messaging = FirebaseMessaging.instance;
-  await messaging.requestPermission();
-  final token = await messaging.getToken();
-  if (token != null) await state.registerPushToken(token);
-  messaging.onTokenRefresh.listen(state.registerPushToken);
-}
-```
-
-   Also call `registerPushToken` right after a successful login (e.g. at the end of `AppState.login`).
-5. In Odoo: Settings › School › Mobile App › enable *Push notifications*, paste the Firebase
-   project ID and the service-account JSON key, then *Send me a test notification*.
-
-Tapping a notification: the message `data` has `category`, `student_id` and `res_id`; pass it to
-`openNotificationTarget(context, data)` from `inbox_screen.dart` to open the right screen.
+Building locally instead: put google-services.json in `android/app/` and add the
+`com.google.gms.google-services` Gradle plugin (or run `flutterfire configure`).
 
 ## 5. Release builds
 

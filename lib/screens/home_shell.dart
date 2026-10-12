@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../push/push_service.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import 'family_home.dart';
@@ -18,6 +19,14 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // send this phone's push token to the school, then open a notification tapped while closed
+    PushService.instance.registerDevice();
+    PushService.instance.openPending();
+  }
 
   @override
   Widget build(BuildContext context) {

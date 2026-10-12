@@ -11,6 +11,9 @@ import 'student/exams_screen.dart';
 import 'student/fees_screen.dart';
 import 'student/homework_screen.dart';
 import 'student/leaves_screen.dart';
+import 'student/library_screen.dart';
+import 'student/transport_screen.dart';
+import 'teacher/leave_approvals_screen.dart';
 
 const categoryColors = {
   'notice': AppColors.amber,
@@ -19,6 +22,8 @@ const categoryColors = {
   'leave': AppColors.sky,
   'exam': AppColors.purple,
   'fees': AppColors.teal,
+  'library': AppColors.brown,
+  'transport': AppColors.lime,
   'general': AppColors.indigo,
 };
 
@@ -29,11 +34,14 @@ const categoryIcons = {
   'leave': Icons.event_busy_rounded,
   'exam': Icons.emoji_events_rounded,
   'fees': Icons.currency_rupee_rounded,
+  'library': Icons.menu_book_rounded,
+  'transport': Icons.directions_bus_rounded,
   'general': Icons.notifications_rounded,
 };
 
 /// Opens the screen a notification is about (also used when a push is tapped).
-void openNotificationTarget(BuildContext context, Map n) {
+/// Returns false when the notification has no screen of its own.
+bool openNotificationTarget(BuildContext context, Map n) {
   final studentId = n['student_id'] is int ? n['student_id'] as int : null;
   final resId = n['res_id'] is int ? n['res_id'] as int : null;
   Widget? page;
@@ -48,7 +56,8 @@ void openNotificationTarget(BuildContext context, Map n) {
       if (studentId != null) page = AttendanceScreen(studentId: studentId);
       break;
     case 'leave':
-      if (studentId != null) page = LeavesScreen(studentId: studentId);
+      // parents: the decision on their request; class teacher: a new request to approve
+      page = studentId != null ? LeavesScreen(studentId: studentId) : const LeaveApprovalsScreen();
       break;
     case 'exam':
       if (studentId != null && resId != null) page = ResultScreen(studentId: studentId, resultId: resId);
@@ -56,10 +65,16 @@ void openNotificationTarget(BuildContext context, Map n) {
     case 'fees':
       if (studentId != null) page = FeesScreen(studentId: studentId);
       break;
+    case 'library':
+      if (studentId != null) page = LibraryScreen(studentId: studentId);
+      break;
+    case 'transport':
+      if (studentId != null) page = TransportScreen(studentId: studentId);
+      break;
   }
-  if (page != null) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page!));
-  }
+  if (page == null) return false;
+  Navigator.push(context, MaterialPageRoute(builder: (_) => page!));
+  return true;
 }
 
 class InboxScreen extends StatefulWidget {
