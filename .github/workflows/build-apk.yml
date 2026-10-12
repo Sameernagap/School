@@ -30,7 +30,7 @@ jobs:
           cache: true
 
       - name: Create Android platform folder
-        run: flutter create --org com.bingoforge --project-name school_app --platforms android .
+        run: flutter create --org com.sameer --project-name school_app --platforms android .
 
       # Push notifications: paste the content of google-services.json (Firebase console) into the
       # repository secret GOOGLE_SERVICES_JSON. Without the secret the app is built without push.
@@ -51,8 +51,8 @@ jobs:
             exit 0
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-          grep -q '"package_name": "com.bingoforge.school_app"' android/app/google-services.json \
-            || { echo "::error::google-services.json has no Android app com.bingoforge.school_app"; exit 1; }
+          grep -q '"package_name": "com.sameer.school_app"' android/app/google-services.json \
+            || { echo "::error::google-services.json has no Android app com.sameer.school_app"; exit 1; }
           if [ -f android/settings.gradle.kts ]; then
             sed -i 's#id("dev.flutter.flutter-plugin-loader") version "1.0.0"#&\n    id("com.google.gms.google-services") version "4.4.2" apply false#' android/settings.gradle.kts
             sed -i 's#id("dev.flutter.flutter-gradle-plugin")#&\n    id("com.google.gms.google-services")#' android/app/build.gradle.kts
