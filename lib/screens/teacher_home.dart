@@ -69,6 +69,7 @@ class _TeacherHomeState extends State<TeacherHome> {
     final teacher = state.me['teacher'] is Map ? state.me['teacher'] as Map : const {};
     final classTeacherOf = (teacher['class_teacher_of'] as List? ?? const []).cast<Map>();
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -88,16 +89,18 @@ class _TeacherHomeState extends State<TeacherHome> {
                 final data = snapshot.data!;
                 final cards = <Widget>[];
                 final attendance = data['attendance'];
-                if (attendance is Map) {
+                Widget? todayCard;
+                if (attendance is Map && classTeacherOf.isNotEmpty) {
                   final missing = (attendance['not_taken'] as List? ?? const []).length;
-                  cards.add(StatCard(
-                    label: 'Attendance today',
-                    value: missing > 0 ? '$missing to take' : 'Done',
-                    sub: missing > 0 ? 'Tap to take attendance' : 'All your classes marked',
-                    icon: Icons.fact_check_rounded,
-                    color: missing > 0 ? AppColors.amber : AppColors.emerald,
-                    onTap: () => _open(const AttendanceTakeScreen()),
-                  ));
+                  todayCard = _TodayAttendanceCard(
+                    missing: missing,
+                    classes: classTeacherOf.map((s) => s['name']).join(', '),
+                    canScan: state.hasFeature('qr_attendance'),
+                    onScan: () => _open(const QrAttendanceScreen()),
+                    onList: () => _open(const AttendanceTakeScreen()),
+                  );
+                } else if (state.hasFeature('attendance') && attendance == null && classTeacherOf.isNotEmpty) {
+                  todayCard = const _ServerUpdateCard();
                 }
                 final leaves = data['leaves'];
                 if (leaves is Map) {
@@ -133,20 +136,32 @@ class _TeacherHomeState extends State<TeacherHome> {
                     onTap: () => _open(const SectionsScreen()),
                   ));
                 }
-                return SizedBox(
-                  height: 132,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: cards.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (_, i) => cards[i],
-                  ),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (todayCard != null) Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: todayCard),
+                    if (cards.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                        child: Text('Waiting for you', style: headingStyle(size: 19)),
+                      ),
+                      SizedBox(
+                        height: 130,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: cards.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (_, i) => cards[i],
+                        ),
+                      ),
+                    ],
+                  ],
                 );
               },
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -218,6 +233,126 @@ class _TeacherHomeState extends State<TeacherHome> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+/// "Today's attendance" call to action for class teachers.
+class _TodayAttendanceCard extends StatelessWidget {
+  const _TodayAttendanceCard(
+      {required this.missing, required this.classes, required this.canScan, required this.onScan, required this.onList});
+
+  final int missing;
+  final String classes;
+  final bool canScan;
+  final VoidCallback onScan;
+  final VoidCallback onList;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = missing == 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [BoxShadow(color: Color(0x161B1F3B), blurRadius: 24, offset: Offset(0, 8))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Today's attendance", style: headingStyle(size: 18)),
+                    Text(classes, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 13)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: done ? const Color(0xFFDDF6E8) : const Color(0xFFFFF4D6),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(done ? 'Done' : 'Not taken',
+                    style: TextStyle(
+                        color: done ? const Color(0xFF0F6B3E) : const Color(0xFF8A5A00),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5)),
+              ),
+            ],
+          ),
+          if (!done) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (canScan) ...[
+                  Expanded(
+                    flex: 7,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.sun,
+                        foregroundColor: AppColors.ink,
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      onPressed: onScan,
+                      icon: const Icon(Icons.qr_code_scanner_rounded),
+                      label: const Text('Scan ID cards'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  flex: 5,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE6F4F2),
+                      foregroundColor: const Color(0xFF0F5C55),
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                    onPressed: onList,
+                    child: const Text('Mark by list'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown when the attendance service answers with an error (usually: Odoo module not upgraded).
+class _ServerUpdateCard extends StatelessWidget {
+  const _ServerUpdateCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1EE),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFFD3CB), width: 1.5),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Color(0xFFB5321F)),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Attendance could not be loaded from the school server. Ask the administrator to upgrade the school modules.',
+              style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF7A2418)),
+            ),
+          ),
+        ],
       ),
     );
   }

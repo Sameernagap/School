@@ -208,7 +208,7 @@ class SectionTitle extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.ink)),
+            child: Text(text, style: headingStyle(size: 19)),
           ),
           if (trailing != null) trailing!,
         ],
@@ -251,12 +251,22 @@ class HeroHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(colors: [color, Color.lerp(color, Colors.black, 0.25)!]),
-      ),
-      child: Row(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), color: color),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -34,
+            top: -34,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(color: AppColors.sun.withAlpha(225), shape: BoxShape.circle),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
         children: [
           if (icon != null) ...[
             Container(
@@ -271,15 +281,18 @@ class HeroHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                Text(title, style: headingStyle(size: 22, color: Colors.white)),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(subtitle!, style: TextStyle(color: Colors.white.withAlpha(220), fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 2),
+                  Text(subtitle!, style: TextStyle(color: Colors.white.withAlpha(225), fontWeight: FontWeight.w600)),
                 ],
               ],
             ),
           ),
           if (trailing != null) trailing!,
+        ],
+            ),
+          ),
         ],
       ),
     );
@@ -393,15 +406,39 @@ class PageScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final teacher = context.select<AppState, bool>((s) => s.showTeacher);
+    final canPop = Navigator.of(context).canPop();
     return Scaffold(
+      backgroundColor: teacher ? AppColors.teacherGround : AppColors.ground,
       appBar: AppBar(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-        backgroundColor: AppColors.ground,
+        title: Text(title, style: headingStyle(size: 23)),
+        backgroundColor: teacher ? AppColors.teacherGround : AppColors.ground,
         surfaceTintColor: Colors.transparent,
+        leadingWidth: canPop ? 64 : null,
+        leading: canPop
+            ? Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Center(
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppColors.ink),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : null,
         actions: actions,
       ),
       floatingActionButton: floatingActionButton,
-      body: body,
+      body: DottedBackground(teacher: teacher, child: body),
     );
   }
 }

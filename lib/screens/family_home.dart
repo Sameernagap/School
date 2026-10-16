@@ -26,6 +26,7 @@ class FamilyHome extends StatelessWidget {
     final student = state.selectedStudent;
     if (student == null) {
       return Scaffold(
+      backgroundColor: Colors.transparent,
         body: Column(
           children: [
             const HomeHeader(subtitle: 'No student is linked to your account yet.'),
@@ -41,6 +42,7 @@ class FamilyHome extends StatelessWidget {
     }
     final id = student['id'] as int;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: () => state.refreshMe(),
         child: ListView(
