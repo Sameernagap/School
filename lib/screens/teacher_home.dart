@@ -10,6 +10,9 @@ import 'teacher/attendance_take_screen.dart';
 import 'teacher/homework_teacher_screen.dart';
 import 'teacher/leave_approvals_screen.dart';
 import 'teacher/marks_screen.dart';
+import 'teacher/qr_attendance_screen.dart';
+import 'staff/staff_attendance_screen.dart';
+import 'staff/staff_leave_screen.dart';
 import 'teacher/sections_screen.dart';
 import 'teacher/send_notice_screen.dart';
 
@@ -155,6 +158,12 @@ class _TeacherHomeState extends State<TeacherHome> {
                           label: 'Take Attendance',
                           color: AppColors.emerald,
                           onTap: () => _open(const AttendanceTakeScreen())),
+                    if (state.hasFeature('attendance') && state.hasFeature('qr_attendance'))
+                      FeatureTile(
+                          icon: Icons.qr_code_scanner_rounded,
+                          label: 'Scan ID Cards',
+                          color: AppColors.teal,
+                          onTap: () => _open(const QrAttendanceScreen())),
                     if (state.hasFeature('homework'))
                       FeatureTile(
                           icon: Icons.edit_note_rounded,
@@ -180,6 +189,18 @@ class _TeacherHomeState extends State<TeacherHome> {
                           color: AppColors.orange,
                           onTap: () => _open(const TimetableScreen(
                               path: '/teacher/timetable', title: 'My timetable', showSection: true))),
+                    if (state.hasFeature('staff'))
+                      FeatureTile(
+                          icon: Icons.badge_rounded,
+                          label: 'My Attendance',
+                          color: AppColors.cyan,
+                          onTap: () => _open(const StaffAttendanceScreen())),
+                    if (state.hasFeature('staff'))
+                      FeatureTile(
+                          icon: Icons.beach_access_rounded,
+                          label: 'My Leave',
+                          color: AppColors.violet,
+                          onTap: () => _open(const StaffLeaveScreen())),
                     FeatureTile(
                         icon: Icons.groups_rounded,
                         label: 'My Classes',

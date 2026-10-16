@@ -13,6 +13,7 @@ import 'student/homework_screen.dart';
 import 'student/leaves_screen.dart';
 import 'student/library_screen.dart';
 import 'student/transport_screen.dart';
+import 'staff/staff_leave_screen.dart';
 import 'teacher/leave_approvals_screen.dart';
 
 const categoryColors = {
@@ -24,6 +25,7 @@ const categoryColors = {
   'fees': AppColors.teal,
   'library': AppColors.brown,
   'transport': AppColors.lime,
+  'staff': AppColors.violet,
   'general': AppColors.indigo,
 };
 
@@ -36,6 +38,7 @@ const categoryIcons = {
   'fees': Icons.currency_rupee_rounded,
   'library': Icons.menu_book_rounded,
   'transport': Icons.directions_bus_rounded,
+  'staff': Icons.beach_access_rounded,
   'general': Icons.notifications_rounded,
 };
 
@@ -70,6 +73,9 @@ bool openNotificationTarget(BuildContext context, Map n) {
       break;
     case 'transport':
       if (studentId != null) page = TransportScreen(studentId: studentId);
+      break;
+    case 'staff':
+      page = const StaffLeaveScreen();
       break;
   }
   if (page == null) return false;

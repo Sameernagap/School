@@ -17,7 +17,10 @@ const _statuses = [
 
 /// Pick a section and a date, then mark each student.
 class AttendanceTakeScreen extends StatefulWidget {
-  const AttendanceTakeScreen({super.key});
+  const AttendanceTakeScreen({super.key, this.sectionId});
+
+  /// Open this section directly (e.g. after scanning ID cards); defaults to the first section.
+  final int? sectionId;
 
   @override
   State<AttendanceTakeScreen> createState() => _AttendanceTakeScreenState();
@@ -46,7 +49,10 @@ class _AttendanceTakeScreenState extends State<AttendanceTakeScreen> {
       final data = await _api.get('/teacher/sections');
       // Daily attendance is taken by the class teacher only.
       _sections = (data as List).cast<Map>().where((s) => s['is_class_teacher'] == true).toList();
-      _sectionId = _sections.isNotEmpty ? _sections.first['id'] as int? : null;
+      final wanted = _sections.where((s) => s['id'] == widget.sectionId);
+      _sectionId = wanted.isNotEmpty
+          ? wanted.first['id'] as int?
+          : (_sections.isNotEmpty ? _sections.first['id'] as int? : null);
       if (_sectionId != null) {
         await _openSheet();
       }

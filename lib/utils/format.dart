@@ -24,6 +24,21 @@ String fmtDateTime(dynamic value) {
   return '${d.day} ${_months[d.month - 1]}, ${_two(d.hour)}:${_two(d.minute)}';
 }
 
+/// UTC "2026-10-09T03:12:00Z" -> local "08:42"
+String fmtTime(dynamic value) {
+  final d = parseDate(value)?.toLocal();
+  if (d == null) return '-';
+  return '${_two(d.hour)}:${_two(d.minute)}';
+}
+
+/// 7.5 -> "7h 30m"
+String fmtHours(dynamic value) {
+  final v = (value is num) ? value.toDouble() : 0.0;
+  final h = v.floor();
+  final m = ((v - h) * 60).round();
+  return m == 0 ? '${h}h' : '${h}h ${m}m';
+}
+
 String fmtMonth(DateTime d) => '${_monthsLong[d.month - 1]} ${d.year}';
 
 String isoDate(DateTime d) => '${d.year}-${_two(d.month)}-${_two(d.day)}';
