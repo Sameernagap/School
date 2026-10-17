@@ -5,6 +5,8 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'home_shell.dart';
+import 'preprimary/albums_teacher_screen.dart';
+import 'preprimary/diary_teacher_screen.dart';
 import 'student/timetable_screen.dart';
 import 'teacher/attendance_take_screen.dart';
 import 'teacher/homework_teacher_screen.dart';
@@ -179,10 +181,22 @@ class _TeacherHomeState extends State<TeacherHome> {
                           label: 'Scan ID Cards',
                           color: AppColors.teal,
                           onTap: () => _open(const QrAttendanceScreen())),
+                    if (state.hasFeature('diary'))
+                      FeatureTile(
+                          icon: Icons.menu_book_rounded,
+                          label: 'Daily Diary',
+                          color: AppColors.rose,
+                          onTap: () => _open(const TeacherDiaryScreen())),
+                    if (state.hasFeature('photos'))
+                      FeatureTile(
+                          icon: Icons.add_a_photo_rounded,
+                          label: 'Photos',
+                          color: AppColors.pink,
+                          onTap: () => _open(const TeacherAlbumsScreen())),
                     if (state.hasFeature('homework'))
                       FeatureTile(
                           icon: Icons.edit_note_rounded,
-                          label: 'Homework',
+                          label: state.school['type'] == 'preprimary' ? 'Activities' : 'Homework',
                           color: AppColors.pink,
                           onTap: () => _open(const TeacherHomeworkScreen())),
                     if (state.hasFeature('exams'))

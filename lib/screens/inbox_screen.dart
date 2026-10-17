@@ -6,6 +6,8 @@ import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 import 'notices_screen.dart';
+import 'preprimary/diary_screen.dart';
+import 'preprimary/photos_screen.dart';
 import 'student/attendance_screen.dart';
 import 'student/exams_screen.dart';
 import 'student/fees_screen.dart';
@@ -26,6 +28,8 @@ const categoryColors = {
   'library': AppColors.brown,
   'transport': AppColors.lime,
   'staff': AppColors.violet,
+  'diary': AppColors.rose,
+  'photos': AppColors.pink,
   'general': AppColors.indigo,
 };
 
@@ -39,6 +43,8 @@ const categoryIcons = {
   'library': Icons.menu_book_rounded,
   'transport': Icons.directions_bus_rounded,
   'staff': Icons.beach_access_rounded,
+  'diary': Icons.menu_book_rounded,
+  'photos': Icons.photo_library_rounded,
   'general': Icons.notifications_rounded,
 };
 
@@ -76,6 +82,14 @@ bool openNotificationTarget(BuildContext context, Map n) {
       break;
     case 'staff':
       page = const StaffLeaveScreen();
+      break;
+    case 'diary':
+      if (studentId != null) page = DiaryScreen(studentId: studentId);
+      break;
+    case 'photos':
+      if (studentId != null) {
+        page = resId != null ? AlbumScreen(studentId: studentId, albumId: resId) : AlbumsScreen(studentId: studentId);
+      }
       break;
   }
   if (page == null) return false;

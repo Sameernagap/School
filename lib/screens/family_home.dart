@@ -6,6 +6,9 @@ import '../theme.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 import 'home_shell.dart';
+import 'preprimary/diary_common.dart';
+import 'preprimary/diary_screen.dart';
+import 'preprimary/photos_screen.dart';
 import 'student/attendance_screen.dart';
 import 'student/exams_screen.dart';
 import 'student/fees_screen.dart';
@@ -79,7 +82,20 @@ class FamilyHome extends StatelessWidget {
 
   List<Widget> _tiles(BuildContext context, AppState state, int id) {
     void open(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    final diary = diaryForStudent(state, state.selectedStudent);
     return [
+      if (diary)
+        FeatureTile(
+            icon: Icons.menu_book_rounded,
+            label: 'Daily Diary',
+            color: AppColors.rose,
+            onTap: () => open(DiaryScreen(studentId: id))),
+      if (state.hasFeature('photos'))
+        FeatureTile(
+            icon: Icons.photo_library_rounded,
+            label: 'Photos',
+            color: AppColors.pink,
+            onTap: () => open(AlbumsScreen(studentId: id))),
       if (state.hasFeature('attendance'))
         FeatureTile(
             icon: Icons.fact_check_rounded,
@@ -212,6 +228,7 @@ class _HighlightsState extends State<_Highlights> {
       }
     }
 
+    final diary = diaryForStudent(state, state.selectedStudent);
     final results = await Future.wait([
       safe(api.get('/students/$studentId')),
       state.hasFeature('fees') ? safe(api.get('/students/$studentId/fees')) : Future.value(null),
@@ -219,8 +236,15 @@ class _HighlightsState extends State<_Highlights> {
       state.hasFeature('homework')
           ? safe(api.get('/students/$studentId/homework', query: {'status': 'pending', 'limit': '1'}))
           : Future.value(null),
+      diary ? safe(api.get('/students/$studentId/diary')) : Future.value(null),
     ]);
-    return {'profile': results[0], 'fees': results[1], 'exams': results[2], 'homework': results[3]};
+    return {
+      'profile': results[0],
+      'fees': results[1],
+      'exams': results[2],
+      'homework': results[3],
+      'diary': results[4],
+    };
   }
 
   @override
@@ -233,6 +257,21 @@ class _HighlightsState extends State<_Highlights> {
         }
         final data = snapshot.data!;
         final cards = <Widget>[];
+        final diaryData = data['diary'];
+        if (diaryData is Map && diaryData['diary'] is Map) {
+          final day = diaryData['diary'] as Map;
+          final entry = day['entry'] is Map ? day['entry'] as Map : const {};
+          final absent = entry['is_absent'] == true;
+          final mood = entry['mood'] as String?;
+          cards.add(StatCard(
+            label: 'Daily diary',
+            value: absent ? 'Absent' : '${moodEmoji[mood] ?? '📖'} ${moodLabels[mood] ?? 'New'}',
+            sub: fmtDate(day['date'], year: false),
+            icon: Icons.menu_book_rounded,
+            color: AppColors.rose,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DiaryScreen(studentId: studentId))),
+          ));
+        }
         final profile = data['profile'];
         if (profile is Map && profile['attendance_rate'] != null) {
           cards.add(StatCard(
