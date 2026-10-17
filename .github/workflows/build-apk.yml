@@ -38,8 +38,6 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          grep -q POST_NOTIFICATIONS "$MANIFEST" || sed -i 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#&\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>#' "$MANIFEST"
           # Firebase needs Android 6.0 (API 23) or newer
           if [ -f android/app/build.gradle.kts ]; then
             sed -i 's/minSdk = flutter.minSdkVersion/minSdk = maxOf(flutter.minSdkVersion, 23)/' android/app/build.gradle.kts
@@ -61,6 +59,32 @@ jobs:
             sed -i 's#id "dev.flutter.flutter-gradle-plugin"#&\n    id "com.google.gms.google-services"#' android/app/build.gradle
           fi
           grep -n "google-services\|minSdk" android/settings.gradle* android/app/build.gradle*
+
+      # Phone permissions the app needs. Added after the opening <manifest ...> tag whatever its
+      # attributes are, and the build stops if any is missing (so an APK without them is never made).
+      - name: Add phone permissions (notifications, bus tracking)
+        run: |
+          python3 - <<'PY'
+          import re
+          path = "android/app/src/main/AndroidManifest.xml"
+          xml = open(path, encoding="utf-8").read()
+          perms = ["POST_NOTIFICATIONS", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION",
+                   "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION", "WAKE_LOCK"]
+          missing = [p for p in perms if f'android.permission.{p}"' not in xml]
+          if missing:
+              tag = re.search(r"<manifest\b[^>]*>", xml)
+              if not tag:
+                  raise SystemExit("No <manifest> tag found in " + path)
+              lines = "".join(f'\n    <uses-permission android:name="android.permission.{p}"/>' for p in missing)
+              xml = xml[:tag.end()] + lines + xml[tag.end():]
+              open(path, "w", encoding="utf-8").write(xml)
+          xml = open(path, encoding="utf-8").read()
+          still = [p for p in perms if f'android.permission.{p}"' not in xml]
+          if still:
+              raise SystemExit("Permissions missing in manifest: " + ", ".join(still))
+          print("Permissions OK:", ", ".join(perms))
+          PY
+          grep -n "uses-permission" android/app/src/main/AndroidManifest.xml
 
       - name: Get packages
         run: flutter pub get
