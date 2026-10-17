@@ -15,6 +15,7 @@ import 'student/homework_screen.dart';
 import 'student/leaves_screen.dart';
 import 'student/library_screen.dart';
 import 'student/transport_screen.dart';
+import 'bus/bus_live_screen.dart';
 import 'staff/staff_leave_screen.dart';
 import 'teacher/leave_approvals_screen.dart';
 
@@ -78,7 +79,11 @@ bool openNotificationTarget(BuildContext context, Map n) {
       if (studentId != null) page = LibraryScreen(studentId: studentId);
       break;
     case 'transport':
-      if (studentId != null) page = TransportScreen(studentId: studentId);
+      if (studentId != null) {
+        page = context.read<AppState>().hasFeature('bus_live')
+            ? BusLiveScreen(studentId: studentId)
+            : TransportScreen(studentId: studentId);
+      }
       break;
     case 'staff':
       page = const StaffLeaveScreen();

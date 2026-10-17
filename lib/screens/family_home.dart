@@ -18,6 +18,8 @@ import 'student/library_screen.dart';
 import 'student/student_profile_screen.dart';
 import 'student/timetable_screen.dart';
 import 'student/transport_screen.dart';
+import 'bus/bus_crew_screens.dart';
+import 'bus/bus_live_screen.dart';
 
 /// Home for parents and students: child switcher, key numbers and feature tiles.
 class FamilyHome extends StatelessWidget {
@@ -131,7 +133,15 @@ class FamilyHome extends StatelessWidget {
             icon: Icons.directions_bus_rounded,
             label: 'School Bus',
             color: AppColors.lime,
-            onTap: () => open(TransportScreen(studentId: id))),
+            onTap: () => open(state.hasFeature('bus_live')
+                ? BusLiveScreen(studentId: id)
+                : TransportScreen(studentId: id))),
+      if (state.isBusCrew)
+        FeatureTile(
+            icon: Icons.share_location_rounded,
+            label: 'Run Bus Trip',
+            color: AppColors.teal,
+            onTap: () => open(const BusRoutesScreen())),
       if (state.hasFeature('library'))
         FeatureTile(
             icon: Icons.menu_book_rounded, label: 'Library', color: AppColors.brown, onTap: () => open(LibraryScreen(studentId: id))),

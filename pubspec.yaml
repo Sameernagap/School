@@ -21,6 +21,9 @@ dependencies:
   mobile_scanner: ^7.0.0
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.10
+  geolocator: ^14.0.0
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
   image_picker: ^1.1.2
 
 dev_dependencies:

@@ -8,6 +8,7 @@ import 'home_shell.dart';
 import 'preprimary/albums_teacher_screen.dart';
 import 'preprimary/diary_teacher_screen.dart';
 import 'student/timetable_screen.dart';
+import 'bus/bus_crew_screens.dart';
 import 'teacher/attendance_take_screen.dart';
 import 'teacher/homework_teacher_screen.dart';
 import 'teacher/leave_approvals_screen.dart';
@@ -230,6 +231,12 @@ class _TeacherHomeState extends State<TeacherHome> {
                           label: 'My Leave',
                           color: AppColors.violet,
                           onTap: () => _open(const StaffLeaveScreen())),
+                    if (state.isBusCrew)
+                      FeatureTile(
+                          icon: Icons.share_location_rounded,
+                          label: 'Bus Trip',
+                          color: AppColors.lime,
+                          onTap: () => _open(const BusRoutesScreen())),
                     FeatureTile(
                         icon: Icons.groups_rounded,
                         label: 'My Classes',

@@ -9,6 +9,7 @@ import 'inbox_screen.dart';
 import 'notices_screen.dart';
 import 'profile_screen.dart';
 import 'teacher_home.dart';
+import 'bus/bus_crew_screens.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -32,7 +33,9 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final pages = <Widget>[
-      state.showTeacher ? const TeacherHome() : const FamilyHome(),
+      state.isBusOnly
+          ? const BusRoutesScreen(embedded: true)
+          : (state.showTeacher ? const TeacherHome() : const FamilyHome()),
       const NoticesScreen(),
       const InboxScreen(),
       const ProfileScreen(),

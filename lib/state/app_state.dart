@@ -50,6 +50,12 @@ class AppState extends ChangeNotifier {
   bool get isStudent => roles.contains('student');
   bool get isTeacher => roles.contains('teacher');
   bool get isFamily => isParent || isStudent;
+
+  /// Bus attendant / driver who runs trips in the app.
+  bool get isBusCrew => roles.contains('bus');
+
+  /// Bus staff without a parent, student or teacher role: the app opens on the bus trips.
+  bool get isBusOnly => isBusCrew && !isFamily && !isTeacher;
   bool get canSwitchMode => isTeacher && isFamily;
   List<String> get features => List<String>.from(me['features'] ?? const []);
   bool hasFeature(String name) => features.contains(name);
@@ -139,9 +145,11 @@ class AppState extends ChangeNotifier {
     }) as Map<String, dynamic>;
     api.token = data['token'] as String;
     me = Map<String, dynamic>.from(data['me'] as Map);
-    if (role != null && !roles.contains(role)) {
-      final names = {'parent': 'Parent', 'student': 'Student', 'teacher': 'Teacher'};
-      final available = roles.where(names.containsKey).map((r) => names[r]).join(' or ');
+    // bus staff sign in with the Teacher (staff) choice
+    final roleOk = role == null || roles.contains(role) || (role == 'teacher' && roles.contains('bus'));
+    if (!roleOk) {
+      final names = {'parent': 'Parent', 'student': 'Student', 'teacher': 'Teacher', 'bus': 'Teacher'};
+      final available = roles.where(names.containsKey).map((r) => names[r]).toSet().join(' or ');
       try {
         await api.post('/auth/logout');
       } catch (_) {}

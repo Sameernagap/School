@@ -6,6 +6,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../utils/format.dart';
 import '../../widgets/common.dart';
+import '../bus/bus_live_screen.dart';
 
 class TransportScreen extends StatelessWidget {
   const TransportScreen({super.key, required this.studentId});
@@ -40,6 +41,17 @@ class TransportScreen extends StatelessWidget {
                 title: '${route['code']} · ${route['name']}',
                 subtitle: '${stop['name']} · ${data['trip_label']}',
               ),
+              if (context.read<AppState>().hasFeature('bus_live')) ...[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.lime, padding: const EdgeInsets.symmetric(vertical: 14)),
+                  onPressed: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => BusLiveScreen(studentId: studentId))),
+                  icon: const Icon(Icons.map_rounded),
+                  label: const Text('Where is the bus? (live map)'),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [
