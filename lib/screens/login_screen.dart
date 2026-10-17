@@ -1019,9 +1019,19 @@ class _FieldState extends State<_Field> {
                 maxLines: 1,
                 style: GoogleFonts.poppins(fontSize: 14.5, color: _ink),
                 cursorColor: const Color(0xFF3B6FE0),
+                // The app theme gives every TextField its own white rounded box and focus border.
+                // Here the outer container is the box, so all of the theme's borders and fill are
+                // switched off (border: none alone does not override enabled/focused borders).
                 decoration: InputDecoration(
                   isCollapsed: true,
+                  filled: false,
+                  fillColor: Colors.transparent,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
                   hintText: widget.hint,
                   hintStyle: GoogleFonts.poppins(fontSize: 14.5, color: _hint),
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),

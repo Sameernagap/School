@@ -55,37 +55,106 @@ class _BusRoutesScreenState extends State<BusRoutesScreen> {
     if (saved != null) await tracker.stop(); // trip ended meanwhile
   }
 
+  /// Which button is working right now ('<route id>-pickup'), so it shows a spinner.
+  String? _starting;
+
+  /// Shows a clear box (not a small bar at the bottom) so the staff member knows what to do.
+  Future<void> _problem(String title, String message, {String fix = 'none'}) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.error_outline_rounded, color: AppColors.rose, size: 36),
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          if (fix == 'gps' || fix == 'app')
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                TripTracker.openFix(fix);
+              },
+              child: Text(fix == 'gps' ? 'Turn on Location' : 'Open app settings'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Location must work before a trip starts. Returns false (after explaining) when it does not.
+  Future<bool> _locationReady() async {
+    final problem = await TripTracker.checkLocation();
+    if (problem == null) return true;
+    await _problem('Location needed', problem.message, fix: problem.fix);
+    return false;
+  }
+
   Future<void> _start(Map route, String direction, int interval) async {
-    final problem = await TripTracker.ensurePermission();
-    if (!mounted) return;
-    if (problem != null) {
-      showMessage(context, problem, error: true);
-      return;
+    if (_starting != null) return;
+    setState(() => _starting = '${route['id']}-$direction');
+    try {
+      if (!await _locationReady()) return;
+
+      Map<String, dynamic> trip;
+      try {
+        trip = Map<String, dynamic>.from(
+            await _api.post('/bus/trips', {'route_id': route['id'], 'direction': direction}) as Map);
+      } on ApiException catch (e) {
+        await _problem('Trip not started', e.status == 0 ? 'No internet connection. Check mobile data and try again.' : e.message);
+        if (mounted) setState(() => _version++); // maybe a trip is running already: show it
+        return;
+      }
+
+      final id = (trip['id'] as num).toInt();
+      await TripTracker.instance.start(_api, id, seconds: (trip['interval'] as num? ?? interval).toInt());
+      if (!mounted) return;
+      setState(() => _starting = null);
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => _tripPage(route['mode'], id)));
+      if (mounted) setState(() => _version++);
+    } catch (e) {
+      await _problem('Trip not started', 'Something went wrong: $e');
+    } finally {
+      if (mounted && _starting != null) setState(() => _starting = null);
     }
-    Map<String, dynamic>? trip;
-    final ok = await runAction(context, () async {
-      trip = Map<String, dynamic>.from(await _api.post('/bus/trips', {'route_id': route['id'], 'direction': direction}) as Map);
-    });
-    if (!ok || trip == null || !mounted) return;
-    await TripTracker.instance.start(_api, trip!['id'] as int, seconds: (trip!['interval'] as num? ?? interval).toInt());
-    if (!mounted) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => _tripPage(route['mode'], trip!['id'] as int)));
-    if (mounted) setState(() => _version++);
   }
 
   Future<void> _open(Map trip, int interval, {String? mode}) async {
-    final tracker = TripTracker.instance;
-    if (tracker.tripId != trip['id']) {
-      final problem = await TripTracker.ensurePermission();
-      if (problem != null) {
-        if (mounted) showMessage(context, problem, error: true);
-        return;
+    try {
+      final tracker = TripTracker.instance;
+      final id = (trip['id'] as num).toInt();
+      if (tracker.tripId != id) {
+        if (!await _locationReady()) return;
+        await tracker.start(_api, id, seconds: interval);
       }
-      await tracker.start(_api, trip['id'] as int, seconds: interval);
+      if (!mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => _tripPage(mode, id)));
+      if (mounted) setState(() => _version++);
+    } catch (e) {
+      await _problem('Could not open the trip', 'Something went wrong: $e');
     }
-    if (!mounted) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => _tripPage(mode, trip['id'] as int)));
-    if (mounted) setState(() => _version++);
+  }
+
+  Widget _startButton(Map r, String d, String suggested, int interval) {
+    final busy = _starting == '${r['id']}-$d';
+    final icon = busy
+        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5))
+        : Icon(d == 'pickup' ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded);
+    final label = Text(busy ? 'Starting…' : (d == 'pickup' ? 'Start morning' : 'Start afternoon'));
+    final onPressed = _starting == null ? () => _start(r, d, interval) : null;
+    return d == suggested
+        ? FilledButton.icon(
+            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+            onPressed: onPressed,
+            icon: icon,
+            label: label,
+          )
+        : OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+            onPressed: onPressed,
+            icon: icon,
+            label: label,
+          );
   }
 
   @override
@@ -155,21 +224,7 @@ class _BusRoutesScreenState extends State<BusRoutesScreen> {
                           children: [
                             for (final d in const ['pickup', 'drop']) ...[
                               if (d == 'drop') const SizedBox(width: 10),
-                              Expanded(
-                                child: d == suggested
-                                    ? FilledButton.icon(
-                                        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                                        onPressed: () => _start(r, d, interval),
-                                        icon: Icon(d == 'pickup' ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded),
-                                        label: Text(d == 'pickup' ? 'Start morning' : 'Start afternoon'),
-                                      )
-                                    : OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                                        onPressed: () => _start(r, d, interval),
-                                        icon: Icon(d == 'pickup' ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded),
-                                        label: Text(d == 'pickup' ? 'Start morning' : 'Start afternoon'),
-                                      ),
-                              ),
+                              Expanded(child: _startButton(r, d, suggested, interval)),
                             ],
                           ],
                         ),

@@ -38,26 +38,56 @@ class TripTracker extends ChangeNotifier {
   bool get running => tripId != null;
   int get waiting => _buffer.length;
 
-  /// Asks for location access. Returns a message to show when tracking cannot run, else null.
-  static Future<String?> ensurePermission() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      await Geolocator.openLocationSettings();
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        return 'Turn on Location (GPS) on this phone to share the bus position.';
+  /// Checks location step by step without opening any settings page. Returns null when tracking
+  /// can run, else what is wrong and which settings page fixes it ('gps' or 'app').
+  static Future<({String message, String fix})?> checkLocation() async {
+    final bool gpsOn;
+    try {
+      gpsOn = await Geolocator.isLocationServiceEnabled();
+    } catch (e) {
+      return (message: 'Could not read the phone\'s Location setting ($e).', fix: 'gps');
+    }
+    if (!gpsOn) {
+      return (message: 'Location (GPS) is turned off on this phone. Turn it on and tap Start again.', fix: 'gps');
+    }
+    LocationPermission permission;
+    try {
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission().timeout(const Duration(seconds: 60));
       }
+    } on TimeoutException {
+      return (message: 'No answer to the location question. Tap Start again and choose "While using the app".', fix: 'app');
+    } catch (e) {
+      // e.g. permissions missing from the app build, or a request already open
+      return (message: 'The app could not ask for location access: $e', fix: 'app');
     }
-    var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied) {
-      return 'Allow location access so parents can see the bus.';
+      return (message: 'Location access was not allowed. Tap Start again and choose "While using the app".', fix: 'none');
     }
     if (permission == LocationPermission.deniedForever) {
-      await Geolocator.openAppSettings();
-      return 'Location access is blocked. Allow it in the app settings (Permissions › Location).';
+      return (
+        message: 'Location access is blocked for this app. Open App settings › Permissions › Location and choose "Allow only while using the app".',
+        fix: 'app'
+      );
     }
     return null;
+  }
+
+  static Future<void> openFix(String fix) async {
+    try {
+      if (fix == 'gps') {
+        await Geolocator.openLocationSettings();
+      } else if (fix == 'app') {
+        await Geolocator.openAppSettings();
+      }
+    } catch (_) {}
+  }
+
+  /// Asks for location access. Returns a message to show when tracking cannot run, else null.
+  static Future<String?> ensurePermission() async {
+    final problem = await checkLocation();
+    return problem?.message;
   }
 
   static Future<int?> savedTripId() async {
@@ -99,13 +129,17 @@ class TripTracker extends ChangeNotifier {
     } else {
       settings = const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 0);
     }
-    _positions = Geolocator.getPositionStream(locationSettings: settings).listen(
-      _onPosition,
-      onError: (Object e) {
-        problem = 'GPS problem: $e';
-        notifyListeners();
-      },
-    );
+    try {
+      _positions = Geolocator.getPositionStream(locationSettings: settings).listen(
+        _onPosition,
+        onError: (Object e) {
+          problem = 'GPS problem: $e';
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      problem = 'GPS could not start: $e';
+    }
     _restartTimer();
     notifyListeners();
   }
