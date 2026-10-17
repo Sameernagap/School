@@ -348,14 +348,25 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Address of the school's Odoo server (first-time setup).
   Future<void> _serverDialog() async {
     final state = context.read<AppState>();
+    // whole address selected, so typing or pasting replaces it instead of adding to it
+    _server.selection = TextSelection(baseOffset: 0, extentOffset: _server.text.length);
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('School server'),
         content: TextField(
           controller: _server,
+          autofocus: true,
           keyboardType: TextInputType.url,
-          decoration: const InputDecoration(hintText: 'https://school.example.com'),
+          autocorrect: false,
+          decoration: InputDecoration(
+            hintText: 'https://school.example.com',
+            suffixIcon: IconButton(
+              tooltip: 'Clear',
+              icon: const Icon(Icons.clear_rounded),
+              onPressed: () => _server.clear(),
+            ),
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

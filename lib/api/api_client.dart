@@ -32,8 +32,12 @@ class ApiClient {
 
   /// "192.168.1.5:8069" -> "http://192.168.1.5:8069" ; strips "/api/v1" and trailing slashes.
   static String normalizeServer(String value) {
-    var url = value.trim();
+    var url = value.trim().replaceAll(RegExp(r'\s+'), '');
     if (url.isEmpty) return url;
+    // A new address pasted after an old one ("http://10.0.0.5:https://new.example.com"):
+    // keep only the last address.
+    final last = url.lastIndexOf(RegExp(r'https?://'));
+    if (last > 0) url = url.substring(last);
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'http://$url';
     }
