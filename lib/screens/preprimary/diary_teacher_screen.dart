@@ -353,7 +353,7 @@ class _DiaryFillScreenState extends State<DiaryFillScreen> {
 
 /// One child: absent switch, meal / nap / mood choices, toilet and a personal note.
 class _ChildEntry extends StatefulWidget {
-    const _ChildEntry({super.key, required this.entry, required this.onChanged});
+  const _ChildEntry({super.key, required this.entry, required this.onChanged});
 
   final Map<String, dynamic> entry;
   final void Function(String field, dynamic value) onChanged;

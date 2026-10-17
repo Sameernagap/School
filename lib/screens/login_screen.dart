@@ -1,11 +1,23 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../state/app_state.dart';
-import '../theme.dart';
 import '../widgets/common.dart';
 
+/// Sign-in screen with the three approved designs: Pre-primary (animal adventure), Primary
+/// (rainbow & school) and Secondary (modern campus).
+///
+/// Each design is the approved artwork (assets/login/bg_*.webp) with the live parts laid on top
+/// at the exact positions of the mockup: school logo, school name, tagline, role choice, the form
+/// and the Login button. The whole design is scaled to the phone, so it looks the same on every
+/// screen size. School name, tagline and logo come from Odoo (Settings › School › Mobile App).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -13,15 +25,132 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+/// Positions of the live parts, in points of the 390 pt wide design.
+class _Geom {
+  const _Geom({
+    required this.height,
+    required this.logo,
+    required this.name,
+    required this.tagline,
+    required this.tiles,
+    required this.left,
+    required this.right,
+    required this.fieldHeight,
+    required this.loginY,
+    required this.passwordY,
+    required this.rememberY,
+    required this.button,
+  });
+
+  final double height;
+  final Rect logo;
+  final Rect name;
+  final Rect tagline;
+  final Map<String, Rect> tiles;
+  final double left;
+  final double right;
+  final double fieldHeight;
+  final double loginY;
+  final double passwordY;
+  final double rememberY;
+  final Rect button;
+}
+
+const double _designWidth = 390;
+
+const Map<String, _Geom> _geoms = {
+  'preprimary': _Geom(
+    height: 868.0,
+    logo: Rect.fromLTRB(164.6, 73.8, 222.5, 121.5),
+    name: Rect.fromLTRB(73.5, 121.5, 310.7, 157.7),
+    tagline: Rect.fromLTRB(86.8, 158.5, 303.8, 177.1),
+    tiles: {
+      'parent': Rect.fromLTRB(40.8, 425.3, 139.5, 527.7),
+      'student': Rect.fromLTRB(148.4, 425.3, 247.4, 527.4),
+      'teacher': Rect.fromLTRB(256.3, 425.3, 354.7, 527.1),
+    },
+    left: 40.8,
+    right: 354.7,
+    fieldHeight: 46.3,
+    loginY: 562.9,
+    passwordY: 617.4,
+    rememberY: 663.7,
+    button: Rect.fromLTRB(43.4, 687.4, 352.4, 742.7),
+  ),
+  'primary': _Geom(
+    height: 886.4,
+    logo: Rect.fromLTRB(165.8, 38.4, 229.6, 100.5),
+    name: Rect.fromLTRB(50.2, 101.9, 345.7, 143.3),
+    tagline: Rect.fromLTRB(88.6, 138.3, 307.3, 156.0),
+    tiles: {
+      'parent': Rect.fromLTRB(36.0, 446.4, 137.1, 538.9),
+      'student': Rect.fromLTRB(147.1, 446.4, 248.8, 538.6),
+      'teacher': Rect.fromLTRB(258.8, 446.1, 359.9, 538.3),
+    },
+    left: 36.0,
+    right: 359.9,
+    fieldHeight: 47.3,
+    loginY: 575.1,
+    passwordY: 630.5,
+    rememberY: 677.8,
+    button: Rect.fromLTRB(37.8, 702.0, 358.1, 758.4),
+  ),
+  'secondary': _Geom(
+    height: 908.4,
+    logo: Rect.fromLTRB(155.0, 33.3, 239.8, 106.0),
+    name: Rect.fromLTRB(45.4, 109.0, 339.1, 145.9),
+    tagline: Rect.fromLTRB(72.7, 151.4, 305.8, 169.0),
+    tiles: {
+      'parent': Rect.fromLTRB(33.3, 457.2, 136.0, 552.3),
+      'student': Rect.fromLTRB(145.6, 457.5, 248.3, 552.0),
+      'teacher': Rect.fromLTRB(257.7, 457.5, 359.4, 551.7),
+    },
+    left: 33.3,
+    right: 359.4,
+    fieldHeight: 48.4,
+    loginY: 589.4,
+    passwordY: 646.3,
+    rememberY: 694.6,
+    button: Rect.fromLTRB(34.2, 719.4, 358.5, 777.3),
+  ),
+};
+
+const _defaultTaglines = {
+  'preprimary': 'Learn · Play · Be Happy',
+  'primary': 'Learn · Grow · Achieve',
+  'secondary': 'Learn Today · Lead Tomorrow',
+};
+const _defaultLogoPresets = {'preprimary': 'sun_book', 'primary': 'sun_book', 'secondary': 'cap'};
+const _logoPresets = {'sun_book', 'shield', 'people', 'cap'};
+
+const _roleColors = {
+  'parent': Color(0xFFF0287A),
+  'student': Color(0xFF1D7FF0),
+  'teacher': Color(0xFF1E9B48),
+};
+const _roleLabels = {'parent': 'Parent', 'student': 'Student', 'teacher': 'Teacher'};
+
+const _buttonColors = {
+  'preprimary': [Color(0xFFFF3175), Color(0xFFFF1A6B)],
+  'primary': [Color(0xFF0080FF), Color(0xFF0066FF)],
+  'secondary': [Color(0xFFFF7600), Color(0xFFFF6400)],
+};
+
+const _ink = Color(0xFF111827);
+const _iconInk = Color(0xFF1F2433);
+const _hint = Color(0xFF4A5168);
+const _link = Color(0xFF0A58F0);
+const _navy = Color(0xFF1B2A6B);
+
 class _LoginScreenState extends State<LoginScreen> {
-  final _form = GlobalKey<FormState>();
   final _login = TextEditingController();
   final _password = TextEditingController();
   final _server = TextEditingController();
+  final _passwordFocus = FocusNode();
   bool _busy = false;
   bool _hidePassword = true;
-  bool _showServer = false;
-  String? _error;
+  bool _remember = true;
+  String _role = 'parent';
   Map<String, dynamic>? _school;
 
   @override
@@ -29,19 +158,23 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     final state = context.read<AppState>();
     _server.text = state.serverUrl;
-    _error = state.sessionMessage;
+    _remember = state.rememberMe;
+    _login.text = state.savedLogin;
+    _role = state.mode == 'teacher' ? 'teacher' : 'parent';
     _loadSchool();
+    final message = state.sessionMessage;
+    if (message != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showMessage(context, message, error: true);
+      });
+    }
   }
 
-  /// School name, logo and sign-in photo from the server (shown above the form).
-  Future<void> _loadSchool() async {
-    try {
-      final data = await context.read<AppState>().api.get('/ping');
-      if (data is Map && data['school'] is Map && mounted) {
-        setState(() => _school = Map<String, dynamic>.from(data['school'] as Map));
-      }
-    } catch (_) {
-      // server not reachable yet: keep the illustration
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    for (final level in _geoms.keys) {
+      precacheImage(AssetImage('assets/login/bg_${_short(level)}.webp'), context);
     }
   }
 
@@ -50,36 +183,66 @@ class _LoginScreenState extends State<LoginScreen> {
     _login.dispose();
     _password.dispose();
     _server.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
-    final state = context.read<AppState>();
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+  static String _short(String level) =>
+      const {'preprimary': 'pre', 'primary': 'pri', 'secondary': 'sec'}[level]!;
+
+  /// Name, logo, tagline and design of each section, from the school server.
+  Future<void> _loadSchool() async {
     try {
-      await state.setServer(_server.text);
-      await state.login(_login.text, _password.text);
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      final data = await context.read<AppState>().api.get('/ping');
+      if (data is Map && data['school'] is Map && mounted) {
+        setState(() => _school = Map<String, dynamic>.from(data['school'] as Map));
+      }
+    } catch (_) {
+      // server not reachable yet: built-in design, logo and a generic name
     }
   }
 
-  Future<void> _testServer() async {
+  String get _level {
+    final saved = context.read<AppState>().loginLevel;
+    if (saved != null && _geoms.containsKey(saved)) return saved;
+    final style = (_school?['login_style'] ?? 'primary').toString();
+    return _geoms.containsKey(style) ? style : 'primary';
+  }
+
+  Map<String, dynamic> _section(String level) {
+    final sections = _school?['sections'];
+    if (sections is Map && sections[level] is Map) return Map<String, dynamic>.from(sections[level] as Map);
+    return {
+      'name': (_school?['name'] ?? 'Our School').toString(),
+      'tagline': _defaultTaglines[level],
+      'logo_url': null,
+      'logo_preset': _defaultLogoPresets[level],
+    };
+  }
+
+  Future<void> _submit() async {
+    final login = _login.text.trim();
+    if (login.isEmpty) {
+      showMessage(context, 'Enter your username or mobile number', error: true);
+      return;
+    }
+    if (_password.text.isEmpty) {
+      showMessage(context, 'Enter your password', error: true);
+      return;
+    }
+    FocusScope.of(context).unfocus();
     final state = context.read<AppState>();
-    await state.setServer(_server.text);
-    _server.text = state.serverUrl;
-    await runAction(context, () async {
-      await state.api.get('/ping');
-    }, success: 'Connected to ${state.serverUrl}');
-    _loadSchool();
+    setState(() => _busy = true);
+    try {
+      await state.setServer(_server.text);
+      await state.login(login, _password.text, role: _role, remember: _remember);
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+    } catch (e) {
+      if (mounted) showMessage(context, e.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _forgot() async {
@@ -90,8 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
         title: const Text('Reset password'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(labelText: 'Email / login'),
-          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Username / mobile number / email'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
@@ -102,253 +264,639 @@ class _LoginScreenState extends State<LoginScreen> {
     if (login == null || login.trim().isEmpty || !mounted) return;
     final state = context.read<AppState>();
     await state.setServer(_server.text);
+    if (!mounted) return;
     await runAction(context, () async {
       final data = await state.api.post('/auth/password/reset', {'login': login.trim()});
       if (mounted) showMessage(context, (data as Map)['message'].toString());
     });
   }
 
+  /// Address of the school's Odoo server (first-time setup).
+  Future<void> _serverDialog() async {
+    final state = context.read<AppState>();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('School server'),
+        content: TextField(
+          controller: _server,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://school.example.com'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, _server.text), child: const Text('Connect')),
+        ],
+      ),
+    );
+    if (value == null || !mounted) return;
+    await state.setServer(value);
+    _server.text = state.serverUrl;
+    if (!mounted) return;
+    await runAction(context, () async {
+      await state.api.get('/ping');
+    }, success: 'Connected to ${state.serverUrl}');
+    _loadSchool();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final api = context.read<AppState>().api;
-    final photo = _school?['photo_url']?.toString();
-    final logo = _school?['logo_url']?.toString();
-    final name = (_school?['name'] ?? 'School').toString();
-    final top = MediaQuery.of(context).padding.top;
-    return Scaffold(
-      backgroundColor: AppColors.indigo,
-      body: CustomPaint(
-        painter: _LoginDots(),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // school photo (uploaded by the admin in Odoo), or an illustration until then
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(36)),
-                child: SizedBox(
-                  height: 330 + top,
-                  child: photo != null
-                      ? Image.network(api.url(photo), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const _SchoolIllustration())
-                      : const _SchoolIllustration(),
-                ),
+    final level = _level;
+    final geom = _geoms[level]!;
+    final background = 'assets/login/bg_${_short(level)}.webp';
+    // full screen size (does not shrink when the keyboard opens, so the design keeps its scale)
+    final screen = MediaQuery.sizeOf(context);
+    final scale = math.min(screen.width / _designWidth, screen.height / geom.height);
+    final width = _designWidth * scale;
+    final height = geom.height * scale;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: level == 'secondary' ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            // soft copy of the artwork behind the side (or top/bottom) bands of odd-sized screens
+            Positioned.fill(
+              child: ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: Image.asset(background, fit: BoxFit.cover, cacheWidth: 200),
               ),
-              Transform.translate(
-                offset: const Offset(0, -42),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 22),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(
-                        width: 84,
-                        height: 84,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(26),
-                          border: Border.all(color: AppColors.sun, width: 4),
-                          boxShadow: const [BoxShadow(color: Color(0x38000000), blurRadius: 20, offset: Offset(0, 8))],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        padding: const EdgeInsets.all(6),
-                        child: logo != null
-                            ? Image.network(api.url(logo),
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, size: 40, color: AppColors.indigo))
-                            : const Icon(Icons.school_rounded, size: 40, color: AppColors.indigo),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(name, style: headingStyle(size: 25, color: Colors.white), maxLines: 2),
-                              const Text('Parents · Students · Teachers',
-                                  style: TextStyle(color: Color(0xFFDCDDFB), fontWeight: FontWeight.w700, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Transform.translate(
-                offset: const Offset(0, -24),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 460),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(28),
-                          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 30, offset: Offset(0, 12))],
-                        ),
-                        child: Form(
-                          key: _form,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text('Welcome back', style: headingStyle(size: 24)),
-                              const Text('Use the login given by your school office.',
-                                  style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 14),
-                              if (_error != null) ...[
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                      color: AppColors.soft(AppColors.rose), borderRadius: BorderRadius.circular(12)),
-                                  child: Text(_error!, style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.w700)),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              TextFormField(
-                                controller: _login,
-                                keyboardType: TextInputType.emailAddress,
-                                autofillHints: const [AutofillHints.username, AutofillHints.email],
-                                decoration: const InputDecoration(
-                                    labelText: 'Mobile number or email', prefixIcon: Icon(Icons.person_outline_rounded)),
-                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your login' : null,
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _password,
-                                obscureText: _hidePassword,
-                                autofillHints: const [AutofillHints.password],
-                                onFieldSubmitted: (_) => _submit(),
-                                decoration: InputDecoration(
-                                  labelText: 'Password',
-                                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                                  suffixIcon: IconButton(
-                                    tooltip: _hidePassword ? 'Show password' : 'Hide password',
-                                    icon: Icon(_hidePassword ? Icons.visibility_rounded : Icons.visibility_off_rounded),
-                                    onPressed: () => setState(() => _hidePassword = !_hidePassword),
-                                  ),
-                                ),
-                                validator: (v) => (v == null || v.isEmpty) ? 'Enter your password' : null,
-                              ),
-                              if (_showServer) ...[
-                                const SizedBox(height: 12),
-                                TextFormField(
-                                  controller: _server,
-                                  keyboardType: TextInputType.url,
-                                  decoration: InputDecoration(
-                                    labelText: 'School server',
-                                    hintText: 'http://192.168.1.25:8069',
-                                    prefixIcon: const Icon(Icons.dns_outlined),
-                                    suffixIcon: IconButton(
-                                      tooltip: 'Test connection',
-                                      icon: const Icon(Icons.wifi_tethering),
-                                      onPressed: _testServer,
-                                    ),
-                                  ),
-                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the server address' : null,
-                                ),
-                              ],
-                              const SizedBox(height: 18),
-                              FilledButton(
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(54),
-                                  backgroundColor: AppColors.sun,
-                                  foregroundColor: AppColors.ink,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
-                                ),
-                                onPressed: _busy ? null : _submit,
-                                child: _busy
-                                    ? const SizedBox(
-                                        width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.ink))
-                                    : Text('Sign in', style: headingStyle(size: 19)),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  TextButton(onPressed: _forgot, child: const Text('Forgot password?')),
-                                  TextButton.icon(
-                                    onPressed: () => setState(() => _showServer = !_showServer),
-                                    icon: const Icon(Icons.settings_outlined, size: 18),
-                                    label: const Text('Server'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+            ),
+            SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: screen.height),
+                child: Center(
+                  child: SizedBox(
+                    width: width,
+                    height: height,
+                    child: FittedBox(
+                      child: SizedBox(
+                        width: _designWidth,
+                        height: geom.height,
+                        child: _design(level, geom, background, (width * dpr).round()),
                       ),
                     ),
                   ),
                 ),
               ),
-              Text(context.watch<AppState>().serverUrl,
-                  textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFB9BCF2), fontSize: 12)),
-              const SizedBox(height: 24),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _design(String level, _Geom g, String background, int cacheWidth) {
+    final section = _section(level);
+    final name = (section['name'] ?? '').toString().trim();
+    final tagline = (section['tagline'] ?? '').toString();
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(background, fit: BoxFit.fill, cacheWidth: cacheWidth, filterQuality: FilterQuality.medium),
+        ),
+        // school server address (first-time setup)
+        Positioned(
+          left: 12,
+          top: 48,
+          child: Tooltip(
+            message: 'School server',
+            child: Material(
+              color: Colors.white.withAlpha(185),
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _serverDialog,
+                child: Padding(padding: const EdgeInsets.all(6), child: _svg('settings', 18, _iconInk)),
+              ),
+            ),
+          ),
+        ),
+        // logo
+        Positioned.fromRect(rect: g.logo, child: _SchoolLogo(level: level, section: section)),
+        // school name
+        Positioned.fromRect(rect: g.name.inflate(2), child: _SchoolName(level: level, name: name)),
+        // tagline
+        Positioned.fromRect(
+          rect: Rect.fromLTRB(g.tagline.left - 30, g.tagline.top, g.tagline.right + 30, g.tagline.bottom),
+          child: FittedBox(fit: BoxFit.scaleDown, child: _Tagline(level: level, text: tagline)),
+        ),
+        // role choice: the cards are part of the artwork, the app adds the touch and the selection ring
+        for (final entry in g.tiles.entries)
+          Positioned.fromRect(
+            rect: entry.value.inflate(2),
+            child: _RoleTile(
+              role: entry.key,
+              selected: _role == entry.key,
+              onTap: () => setState(() => _role = entry.key),
+            ),
+          ),
+        // username / mobile number
+        Positioned(
+          left: g.left,
+          width: g.right - g.left,
+          top: g.loginY - g.fieldHeight / 2,
+          height: g.fieldHeight,
+          child: _Field(
+            controller: _login,
+            hint: 'Username / Mobile Number',
+            icon: 'user',
+            keyboardType: TextInputType.emailAddress,
+            autofill: AutofillHints.username,
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => _passwordFocus.requestFocus(),
+          ),
+        ),
+        // password
+        Positioned(
+          left: g.left,
+          width: g.right - g.left,
+          top: g.passwordY - g.fieldHeight / 2,
+          height: g.fieldHeight,
+          child: _Field(
+            controller: _password,
+            focusNode: _passwordFocus,
+            hint: 'Password',
+            icon: 'lock',
+            obscure: _hidePassword,
+            autofill: AutofillHints.password,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            suffix: IconButton(
+              tooltip: _hidePassword ? 'Show password' : 'Hide password',
+              onPressed: () => setState(() => _hidePassword = !_hidePassword),
+              icon: _svg(_hidePassword ? 'eye' : 'eye-off', 22, _iconInk),
+            ),
+          ),
+        ),
+        // remember me / forgot password
+        Positioned(
+          left: g.left - 4,
+          right: _designWidth - g.right - 6,
+          top: g.rememberY - 18,
+          height: 36,
+          child: Row(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => setState(() => _remember = !_remember),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Row(
+                    children: [
+                      _CheckBox(value: _remember, color: _buttonColors[level]!.last),
+                      const SizedBox(width: 10),
+                      Text('Remember me', style: GoogleFonts.poppins(fontSize: 14, color: _ink)),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero),
+                onPressed: _forgot,
+                child: Text('Forgot Password?',
+                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: _link)),
+              ),
             ],
           ),
+        ),
+        // login
+        Positioned.fromRect(
+          rect: g.button,
+          child: _LoginButton(colors: _buttonColors[level]!, busy: _busy, onPressed: _submit),
+        ),
+      ],
+    );
+  }
+}
+
+Widget _svg(String name, double size, Color color) => SvgPicture.asset(
+      'assets/login/icons/$name.svg',
+      width: size,
+      height: size,
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    );
+
+/// Logo of the section: the one uploaded in Odoo, else the chosen design logo (shipped with the app
+/// too, so it shows before the server answers), else the school icon.
+class _SchoolLogo extends StatelessWidget {
+  const _SchoolLogo({required this.level, required this.section});
+
+  final String level;
+  final Map<String, dynamic> section;
+
+  @override
+  Widget build(BuildContext context) {
+    final preset = section['logo_preset']?.toString();
+    final url = section['logo_url']?.toString();
+    final bundled = (preset != null && _logoPresets.contains(preset)) ? 'assets/login/logo_$preset.png' : null;
+    Widget fallback() => bundled != null
+        ? Image.asset(bundled, fit: BoxFit.contain)
+        : Padding(padding: const EdgeInsets.all(6), child: _svg('school', 40, _navy));
+    Widget image;
+    if (bundled != null) {
+      image = fallback(); // same picture as the server would send
+    } else if (url != null) {
+      final api = context.read<AppState>().api;
+      image = Image.network(api.url(url), fit: BoxFit.contain, errorBuilder: (_, __, ___) => fallback());
+    } else {
+      image = fallback();
+    }
+    if (level == 'secondary') return image;
+    // pre-primary and primary: round white badge with an orange ring
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFF5A524), width: level == 'primary' ? 2.4 : 2),
+            boxShadow: const [BoxShadow(color: Color(0x2E000000), blurRadius: 8, offset: Offset(0, 3))],
+          ),
+          child: ClipOval(child: image),
         ),
       ),
     );
   }
 }
 
-class _LoginDots extends CustomPainter {
+/// Colours of the letters of the school name, per word, like the mockups.
+List<(String, Color)> _nameLetters(String level, String name) {
+  const palettes = {
+    'preprimary': [
+      [Color(0xFFE8232E), Color(0xFFF57C00)],
+      [Color(0xFF1E9E3A), Color(0xFF1E9E3A)],
+      [Color(0xFF8E24AA), Color(0xFF9C27B0)],
+    ],
+    'primary': [
+      [Color(0xFFE53935), Color(0xFFFB8C00)],
+      [Color(0xFF2E9E3A), Color(0xFF1E88E5)],
+      [Color(0xFF1E5BD8), Color(0xFF7B1FA2)],
+    ],
+  };
+  const navy = Color(0xFF18306E);
+  const orange = Color(0xFFF4511E);
+  final words = name.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  final letters = <(String, Color)>[];
+  for (var w = 0; w < words.length; w++) {
+    final word = words[w];
+    Color colorAt(int i) {
+      if (level == 'secondary') {
+        // middle word(s) orange: "Sunrise Public School", or the 2nd of two words
+        final orangeWord = words.length >= 2 && w > 0 && (w < words.length - 1 || words.length == 2);
+        return orangeWord ? orange : navy;
+      }
+      final pair = palettes[level]![w % 3];
+      final t = word.length > 1 ? i / (word.length - 1) : 0.0;
+      return Color.lerp(pair[0], pair[1], t)!;
+    }
+
+    final chars = word.characters.toList();
+    for (var i = 0; i < chars.length; i++) {
+      letters.add((chars[i], colorAt(i)));
+    }
+    if (w < words.length - 1) letters.add((' ', navy));
+  }
+  return letters;
+}
+
+class _SchoolName extends StatelessWidget {
+  const _SchoolName({required this.level, required this.name});
+
+  final String level;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final display = name.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).join(' ');
+    final shown = display.isEmpty ? 'Our School' : display;
+    final letters = _nameLetters(level, shown);
+    if (level == 'primary') {
+      return CustomPaint(
+        painter: _ArcNamePainter(
+          letters: letters,
+          style: GoogleFonts.baloo2(fontSize: 38, fontWeight: FontWeight.w800, height: 1),
+          sag: 9,
+        ),
+      );
+    }
+    final pre = level == 'preprimary';
+    final base = pre
+        ? GoogleFonts.fredoka(fontSize: 30, fontWeight: FontWeight.w700, height: 1)
+        : GoogleFonts.fredoka(fontSize: 32, fontWeight: FontWeight.w700, height: 1);
+    final spans = [for (final (ch, color) in letters) TextSpan(text: ch, style: TextStyle(color: color))];
+    final fill = Text.rich(
+      TextSpan(children: spans),
+      maxLines: 1,
+      style: pre
+          ? base.copyWith(shadows: const [Shadow(color: Color(0x40502800), offset: Offset(0, 2), blurRadius: 2)])
+          : base,
+    );
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: pre
+          ? Stack(
+              children: [
+                Text(
+                  shown,
+                  maxLines: 1,
+                  style: base.copyWith(
+                    foreground: Paint()
+                      ..style = PaintingStyle.stroke
+                      ..strokeWidth = 5
+                      ..strokeJoin = StrokeJoin.round
+                      ..color = Colors.white,
+                  ),
+                ),
+                fill,
+              ],
+            )
+          : fill,
+    );
+  }
+}
+
+/// Primary: school name on a gentle arch, letters outlined in white (fits any length).
+class _ArcNamePainter extends CustomPainter {
+  _ArcNamePainter({required this.letters, required this.style, required this.sag});
+
+  final List<(String, Color)> letters;
+  final TextStyle style;
+  final double sag;
+
+  List<TextPainter> _layout(double fontSize, {bool stroke = false}) => [
+        for (final (ch, color) in letters)
+          TextPainter(
+            text: TextSpan(
+              text: ch,
+              style: stroke
+                  ? style.copyWith(
+                      fontSize: fontSize,
+                      foreground: Paint()
+                        ..style = PaintingStyle.stroke
+                        ..strokeWidth = fontSize * 0.2
+                        ..strokeJoin = StrokeJoin.round
+                        ..color = Colors.white)
+                  : style.copyWith(
+                      fontSize: fontSize,
+                      color: color,
+                      shadows: const [Shadow(color: Color(0x40002878), offset: Offset(0, 3), blurRadius: 4)]),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(),
+      ];
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0x24FFFFFF);
-    for (double y = 9; y < size.height; y += 18) {
-      for (double x = 9; x < size.width; x += 18) {
-        canvas.drawCircle(Offset(x, y), 1.3, paint);
+    if (letters.isEmpty) return;
+    var fontSize = math.min(style.fontSize ?? 38, size.height * 0.95);
+    var fills = _layout(fontSize);
+    var total = fills.fold<double>(0, (sum, p) => sum + p.width);
+    final maxWidth = size.width * 0.98;
+    if (total > maxWidth) {
+      fontSize *= maxWidth / total;
+      fills = _layout(fontSize);
+      total = fills.fold<double>(0, (sum, p) => sum + p.width);
+    }
+    final strokes = _layout(fontSize, stroke: true);
+    final arch = math.min(sag, size.height * 0.25) * (total / maxWidth).clamp(0.4, 1.0);
+    final radius = (total * total / 4 + arch * arch) / (2 * arch);
+    final centre = Offset(size.width / 2, size.height / 2 - arch / 2 + radius);
+    for (final layer in [strokes, fills]) {
+      var along = -total / 2;
+      for (var i = 0; i < layer.length; i++) {
+        final p = layer[i];
+        final angle = (along + p.width / 2) / radius;
+        canvas.save();
+        canvas.translate(centre.dx + radius * math.sin(angle), centre.dy - radius * math.cos(angle));
+        canvas.rotate(angle);
+        p.paint(canvas, Offset(-p.width / 2, -p.height / 2));
+        canvas.restore();
+        along += fills[i].width;
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(_ArcNamePainter old) => old.letters != letters || old.style != style;
 }
 
-/// Colourful school building shown until the school uploads its own photo.
-class _SchoolIllustration extends StatelessWidget {
-  const _SchoolIllustration();
+class _Tagline extends StatelessWidget {
+  const _Tagline({required this.level, required this.text});
+
+  final String level;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    Widget box(double l, double b, double w, double h, Color c, {double r = 0}) => Positioned(
-          left: l,
-          bottom: b,
-          child: Container(width: w, height: h, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(r))),
-        );
-    return Container(
-      color: const Color(0xFF8FD3FF),
-      child: LayoutBuilder(builder: (context, c) {
-        final mid = c.maxWidth / 2;
+    switch (level) {
+      case 'preprimary':
+        return Text(text,
+            maxLines: 1,
+            style: GoogleFonts.fredoka(fontSize: 17.5, fontWeight: FontWeight.w600, color: const Color(0xFF1E1A2E)));
+      case 'primary':
+        final style = GoogleFonts.baloo2(fontSize: 19.5, fontWeight: FontWeight.w700, height: 1);
         return Stack(
           children: [
-            Positioned(
-                right: 36,
-                top: 60,
-                child: Container(
-                    width: 70, height: 70, decoration: const BoxDecoration(color: AppColors.sun, shape: BoxShape.circle))),
-            box(28, c.maxHeight - 110, 90, 26, Colors.white.withAlpha(230), r: 99),
-            box(70, c.maxHeight - 96, 50, 30, Colors.white.withAlpha(230), r: 99),
-            box(0, 0, c.maxWidth, 100, const Color(0xFF5FC77F)),
-            box(mid - 120, 90, 240, 130, AppColors.coral, r: 8),
-            box(mid - 40, 205, 80, 60, const Color(0xFFF26B5B), r: 8),
-            box(mid - 13, 228, 26, 26, Colors.white, r: 13),
-            box(mid - 1, 262, 3, 40, AppColors.night),
-            box(mid + 2, 288, 26, 14, AppColors.sun),
-            for (final dx in [-95.0, -50.0, 20.0, 65.0]) box(mid + dx, 150, 30, 30, const Color(0xFFCFEFFF), r: 6),
-            box(mid - 17, 90, 34, 50, AppColors.night, r: 4),
-            box(18, 90, 10, 40, const Color(0xFF8A5A2B)),
-            box(-2, 120, 50, 60, const Color(0xFF2E9E5B), r: 30),
-            box(c.maxWidth - 32, 90, 10, 34, const Color(0xFF8A5A2B)),
-            box(c.maxWidth - 52, 114, 50, 54, const Color(0xFF2E9E5B), r: 27),
+            Text(text,
+                maxLines: 1,
+                style: style.copyWith(
+                    foreground: Paint()
+                      ..style = PaintingStyle.stroke
+                      ..strokeWidth = 4
+                      ..strokeJoin = StrokeJoin.round
+                      ..color = Colors.white)),
+            Text(text, maxLines: 1, style: style.copyWith(color: _navy)),
           ],
         );
-      }),
+      default:
+        return Text(text,
+            maxLines: 1, style: GoogleFonts.poppins(fontSize: 15.5, fontWeight: FontWeight.w500, color: _navy));
+    }
+  }
+}
+
+/// Touch area over a role card of the artwork, with a coloured ring and tick when chosen.
+class _RoleTile extends StatelessWidget {
+  const _RoleTile({required this.role, required this.selected, required this.onTap});
+
+  final String role;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _roleColors[role]!;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Sign in as ${_roleLabels[role]}',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: selected ? color : Colors.transparent, width: 3),
+                  boxShadow: selected
+                      ? [BoxShadow(color: color.withAlpha(80), blurRadius: 14, offset: const Offset(0, 6))]
+                      : null,
+                ),
+              ),
+            ),
+            if (selected)
+              Positioned(
+                right: -6,
+                top: -8,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
+  }
+}
+
+class _Field extends StatelessWidget {
+  const _Field({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    this.focusNode,
+    this.obscure = false,
+    this.keyboardType,
+    this.autofill,
+    this.textInputAction,
+    this.onSubmitted,
+    this.suffix,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final String icon;
+  final FocusNode? focusNode;
+  final bool obscure;
+  final TextInputType? keyboardType;
+  final String? autofill;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final Widget? suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(13),
+      borderSide: const BorderSide(color: Color(0xFFE9ECF2)),
+    );
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      autofillHints: autofill == null ? null : [autofill!],
+      textAlignVertical: TextAlignVertical.center,
+      style: GoogleFonts.poppins(fontSize: 14.5, color: _ink),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: GoogleFonts.poppins(fontSize: 14.5, color: _hint),
+        filled: true,
+        fillColor: const Color(0xFFF6F6FA),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        prefixIcon: Padding(padding: const EdgeInsets.only(left: 14, right: 10), child: _svg(icon, 22, _iconInk)),
+        prefixIconConstraints: const BoxConstraints(minWidth: 46, minHeight: 22),
+        suffixIcon: suffix,
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(borderSide: const BorderSide(color: Color(0xFF8AA9F5), width: 1.6)),
+      ),
+    );
+  }
+}
+
+class _CheckBox extends StatelessWidget {
+  const _CheckBox({required this.value, required this.color});
+
+  final bool value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: 19,
+      height: 19,
+      decoration: BoxDecoration(
+        color: value ? color : Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: value ? color : const Color(0xFF50566A), width: 1.6),
+      ),
+      child: value ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
+    );
+  }
+}
+
+class _LoginButton extends StatelessWidget {
+  const _LoginButton({required this.colors, required this.busy, required this.onPressed});
+
+  final List<Color> colors;
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+      final radius = BorderRadius.circular(box.maxHeight / 2);
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: colors),
+          boxShadow: [BoxShadow(color: colors.last.withAlpha(90), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: busy ? null : onPressed,
+            child: Center(
+              child: busy
+                  ? const SizedBox(
+                      width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.6, color: Colors.white))
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Login',
+                            style: GoogleFonts.fredoka(
+                                fontSize: box.maxHeight * 0.44, fontWeight: FontWeight.w600, color: Colors.white)),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 24),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      );
+    });
   }
 }

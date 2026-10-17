@@ -20,6 +20,7 @@ dependencies:
   firebase_messaging: ^16.4.2
   mobile_scanner: ^7.0.0
   google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10
   image_picker: ^1.1.2
 
 dev_dependencies:
@@ -29,3 +30,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/login/
+    - assets/login/icons/

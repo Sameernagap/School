@@ -20,6 +20,9 @@ class AppState extends ChangeNotifier {
   static const _serverKey = 'school_server';
   static const _studentKey = 'school_student';
   static const _modeKey = 'school_mode';
+  static const _levelKey = 'school_login_level';
+  static const _rememberKey = 'school_remember';
+  static const _savedLoginKey = 'school_saved_login';
 
   late ApiClient api;
   AuthStatus status = AuthStatus.loading;
@@ -29,6 +32,11 @@ class AppState extends ChangeNotifier {
   /// 'family' (parent / student screens) or 'teacher'
   String mode = 'family';
   String? sessionMessage;
+
+  /// Sign-in design to show: 'preprimary', 'primary' or 'secondary' (the section of the last user).
+  String? loginLevel;
+  bool rememberMe = true;
+  String savedLogin = '';
 
   // ------------------------------------------------------------------
   // Convenience getters on /me
@@ -73,6 +81,9 @@ class AppState extends ChangeNotifier {
     api.serverUrl = ApiClient.normalizeServer(prefs.getString(_serverKey) ?? defaultServerUrl);
     selectedStudentId = prefs.getInt(_studentKey);
     mode = prefs.getString(_modeKey) ?? 'family';
+    loginLevel = prefs.getString(_levelKey);
+    rememberMe = prefs.getBool(_rememberKey) ?? true;
+    savedLogin = prefs.getString(_savedLoginKey) ?? '';
     String? token;
     try {
       token = await _storage.read(key: _tokenKey);
@@ -110,7 +121,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> login(String login, String password) async {
+  /// Sign in. [role] ('parent', 'student' or 'teacher') is the role chosen on the sign-in screen:
+  /// the account must have it, and it decides which home screen opens. Without [remember] the
+  /// session ends when the app is closed.
+  Future<void> login(String login, String password, {String? role, bool remember = true}) async {
     final data = await api.post('/auth/login', {
       'login': login.trim(),
       'password': password,
@@ -119,13 +133,60 @@ class AppState extends ChangeNotifier {
       'app_version': appVersion,
     }) as Map<String, dynamic>;
     api.token = data['token'] as String;
-    await _storage.write(key: _tokenKey, value: api.token);
     me = Map<String, dynamic>.from(data['me'] as Map);
+    if (role != null && !roles.contains(role)) {
+      final names = {'parent': 'Parent', 'student': 'Student', 'teacher': 'Teacher'};
+      final available = roles.where(names.containsKey).map((r) => names[r]).join(' or ');
+      try {
+        await api.post('/auth/logout');
+      } catch (_) {}
+      api.token = null;
+      me = {};
+      throw ApiException(available.isEmpty
+          ? 'This login has no access to the app. Ask the school office.'
+          : 'This is not a ${names[role]} login. Choose $available above.');
+    }
+    final prefs = await SharedPreferences.getInstance();
+    rememberMe = remember;
+    await prefs.setBool(_rememberKey, remember);
+    if (remember) {
+      savedLogin = login.trim();
+      await prefs.setString(_savedLoginKey, savedLogin);
+      await _storage.write(key: _tokenKey, value: api.token);
+    } else {
+      savedLogin = '';
+      await prefs.remove(_savedLoginKey);
+      try {
+        await _storage.delete(key: _tokenKey);
+      } catch (_) {}
+    }
     _fixSelection();
-    if (!isFamily && isTeacher) mode = 'teacher';
+    if (role == 'teacher' || (!isFamily && isTeacher)) {
+      mode = 'teacher';
+    } else if (role != null) {
+      mode = 'family';
+    }
+    await prefs.setString(_modeKey, mode);
+    await _rememberLevel();
     sessionMessage = null;
     status = AuthStatus.signedIn;
     notifyListeners();
+  }
+
+  /// Section of the signed-in user, so the next sign-in screen uses the same design.
+  Future<void> _rememberLevel() async {
+    String? level;
+    if (showTeacher) {
+      final teacher = me['teacher'] is Map ? me['teacher'] as Map : const {};
+      final levels = (teacher['levels'] as List? ?? const []).cast<String>();
+      if (levels.isNotEmpty) level = levels.contains('primary') ? 'primary' : levels.first;
+    } else {
+      level = selectedStudent?['level'] as String?;
+    }
+    if (level == null) return;
+    loginLevel = level;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_levelKey, level);
   }
 
   Future<void> refreshMe() async {
@@ -149,6 +210,7 @@ class AppState extends ChangeNotifier {
     selectedStudentId = id;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_studentKey, id);
+    await _rememberLevel();
     notifyListeners();
   }
 
