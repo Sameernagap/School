@@ -152,6 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _remember = true;
   String _role = 'parent';
   Map<String, dynamic>? _school;
+  bool _schoolTried = false;
 
   @override
   void initState() {
@@ -192,6 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// Name, logo, tagline and design of each section, from the school server.
   Future<void> _loadSchool() async {
+    if (mounted) setState(() => _schoolTried = false);
     try {
       final data = await context.read<AppState>().api.get('/ping');
       if (data is Map && data['school'] is Map && mounted) {
@@ -200,14 +202,34 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (_) {
       // server not reachable yet: built-in design, logo and a generic name
     }
+    if (mounted) setState(() => _schoolTried = true);
   }
 
-  String get _level {
+  /// True when the school set one sign-in design for every phone in Odoo.
+  bool get _fixed => _school?['login_style_fixed'] == true;
+
+  /// Sections the school has, in school order.
+  List<String> get _levels {
+    final raw = _school?['login_levels'];
+    final levels = raw is List ? raw.map((e) => e.toString()).where(_geoms.containsKey).toList() : <String>[];
+    return levels.isEmpty ? const ['preprimary', 'primary', 'secondary'] : levels;
+  }
+
+  /// Design to show: the one set in Odoo, else the one chosen / remembered on this phone, else the
+  /// school's only section. Null: ask the user to choose their section first.
+  String? get _level {
+    if (_fixed) {
+      final style = (_school?['login_style'] ?? '').toString();
+      if (_geoms.containsKey(style)) return style;
+    }
     final saved = context.read<AppState>().loginLevel;
     if (saved != null && _geoms.containsKey(saved)) return saved;
-    final style = (_school?['login_style'] ?? 'primary').toString();
-    return _geoms.containsKey(style) ? style : 'primary';
+    if (_school != null && _levels.length == 1) return _levels.first;
+    return null;
   }
+
+  /// Still waiting for the school's answer (only matters before a section is known).
+  bool get _waiting => _school == null && !_schoolTried;
 
   Map<String, dynamic> _section(String level) {
     final sections = _school?['sections'];
@@ -271,6 +293,58 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  /// Gear button: choose the section's sign-in design, or set the school server.
+  Future<void> _settingsSheet() async {
+    final state = context.read<AppState>();
+    final current = _level;
+    final canChoose = !_fixed && _levels.length > 1;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (canChoose) ...[
+                Text('My section',
+                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: _ink)),
+                Text('Choose the sign-in screen for your school section.',
+                    style: GoogleFonts.poppins(fontSize: 13, color: _hint)),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    for (final level in _levels) ...[
+                      if (level != _levels.first) const SizedBox(width: 10),
+                      Expanded(child: _SectionChoice(level: level, selected: level == current)),
+                    ],
+                  ],
+                ),
+                const Divider(height: 28),
+              ],
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: _svg('settings', 22, _iconInk),
+                title: const Text('School server'),
+                subtitle: Text(state.serverUrl, maxLines: 1, overflow: TextOverflow.ellipsis),
+                onTap: () => Navigator.pop(context, 'server'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'server') {
+      await _serverDialog();
+    } else {
+      await state.setLoginLevel(choice);
+      if (mounted) setState(() {});
+    }
+  }
+
   /// Address of the school's Odoo server (first-time setup).
   Future<void> _serverDialog() async {
     final state = context.read<AppState>();
@@ -299,9 +373,83 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadSchool();
   }
 
+  /// First opening (no design set in Odoo): the user picks their section once; the phone remembers it.
+  Widget _chooser() {
+    final name = (_school?['name'] ?? '').toString();
+    final reached = _school != null;
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+            children: [
+              Center(
+                child: SizedBox(
+                  width: 76,
+                  height: 76,
+                  child: _SchoolLogo(level: 'primary', section: _section(_levels.contains('primary') ? 'primary' : _levels.first)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (name.isNotEmpty)
+                Text(name,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.fredoka(fontSize: 24, fontWeight: FontWeight.w700, color: _navy)),
+              const SizedBox(height: 18),
+              Text('Choose your section',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(fontSize: 21, fontWeight: FontWeight.w600, color: _ink)),
+              Text('Pick the section of your class or your child\'s class. You can change it later with the ⚙ button.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(fontSize: 13.5, color: _hint)),
+              const SizedBox(height: 20),
+              for (final level in _levels) ...[
+                _SectionCard(
+                  level: level,
+                  onTap: () async {
+                    await context.read<AppState>().setLoginLevel(level);
+                    if (mounted) setState(() {});
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (!reached) ...[
+                const SizedBox(height: 4),
+                Text('The school server could not be reached. Check the address below.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(fontSize: 12.5, color: const Color(0xFFB4232F))),
+              ],
+              const SizedBox(height: 4),
+              Center(
+                child: TextButton.icon(
+                  onPressed: _serverDialog,
+                  icon: _svg('settings', 18, _iconInk),
+                  label: Text('School server: ${context.watch<AppState>().serverUrl}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(fontSize: 12.5, color: _iconInk)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final level = _level;
+    if (level == null) {
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark,
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF4F7FC),
+          body: _waiting ? const Center(child: CircularProgressIndicator()) : _chooser(),
+        ),
+      );
+    }
     final geom = _geoms[level]!;
     final background = 'assets/login/bg_${_short(level)}.webp';
     // full screen size (does not shrink when the keyboard opens, so the design keeps its scale)
@@ -361,14 +509,14 @@ class _LoginScreenState extends State<LoginScreen> {
           left: 12,
           top: 48,
           child: Tooltip(
-            message: 'School server',
+            message: 'Sign-in settings',
             child: Material(
               color: Colors.white.withAlpha(185),
               shape: const CircleBorder(),
               elevation: 2,
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: _serverDialog,
+                onTap: _settingsSheet,
                 child: Padding(padding: const EdgeInsets.all(6), child: _svg('settings', 18, _iconInk)),
               ),
             ),
@@ -425,6 +573,9 @@ class _LoginScreenState extends State<LoginScreen> {
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
             suffix: IconButton(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 40),
+              visualDensity: VisualDensity.compact,
               tooltip: _hidePassword ? 'Show password' : 'Hide password',
               onPressed: () => setState(() => _hidePassword = !_hidePassword),
               icon: _svg(_hidePassword ? 'eye' : 'eye-off', 22, _iconInk),
@@ -776,7 +927,9 @@ class _RoleTile extends StatelessWidget {
   }
 }
 
-class _Field extends StatelessWidget {
+/// Text field that always fills the height of its slot in the design (grey box, icon, text, optional
+/// button), with a blue border while typing.
+class _Field extends StatefulWidget {
   const _Field({
     required this.controller,
     required this.hint,
@@ -802,34 +955,82 @@ class _Field extends StatelessWidget {
   final Widget? suffix;
 
   @override
+  State<_Field> createState() => _FieldState();
+}
+
+class _FieldState extends State<_Field> {
+  FocusNode? _ownFocus;
+  FocusNode get _focus => widget.focusNode ?? (_ownFocus ??= FocusNode());
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus);
+  }
+
+  @override
+  void didUpdateWidget(_Field old) {
+    super.didUpdateWidget(old);
+    if (old.focusNode != widget.focusNode) {
+      (old.focusNode ?? _ownFocus)?.removeListener(_onFocus);
+      _focus.addListener(_onFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_onFocus);
+    _ownFocus?.dispose();
+    super.dispose();
+  }
+
+  void _onFocus() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(13),
-      borderSide: const BorderSide(color: Color(0xFFE9ECF2)),
-    );
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      obscureText: obscure,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      onSubmitted: onSubmitted,
-      autofillHints: autofill == null ? null : [autofill!],
-      textAlignVertical: TextAlignVertical.center,
-      style: GoogleFonts.poppins(fontSize: 14.5, color: _ink),
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: hint,
-        hintStyle: GoogleFonts.poppins(fontSize: 14.5, color: _hint),
-        filled: true,
-        fillColor: const Color(0xFFF6F6FA),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-        prefixIcon: Padding(padding: const EdgeInsets.only(left: 14, right: 10), child: _svg(icon, 22, _iconInk)),
-        prefixIconConstraints: const BoxConstraints(minWidth: 46, minHeight: 22),
-        suffixIcon: suffix,
-        border: border,
-        enabledBorder: border,
-        focusedBorder: border.copyWith(borderSide: const BorderSide(color: Color(0xFF8AA9F5), width: 1.6)),
+    final focused = _focus.hasFocus;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _focus.requestFocus(),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F6FA),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: focused ? const Color(0xFF8AA9F5) : const Color(0xFFE9ECF2),
+            width: focused ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 14),
+            _svg(widget.icon, 22, _iconInk),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                focusNode: _focus,
+                obscureText: widget.obscure,
+                keyboardType: widget.keyboardType,
+                textInputAction: widget.textInputAction,
+                onSubmitted: widget.onSubmitted,
+                autofillHints: widget.autofill == null ? null : [widget.autofill!],
+                maxLines: 1,
+                style: GoogleFonts.poppins(fontSize: 14.5, color: _ink),
+                cursorColor: const Color(0xFF3B6FE0),
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: widget.hint,
+                  hintStyle: GoogleFonts.poppins(fontSize: 14.5, color: _hint),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+              ),
+            ),
+            if (widget.suffix != null) widget.suffix! else const SizedBox(width: 14),
+          ],
+        ),
       ),
     );
   }
@@ -898,5 +1099,122 @@ class _LoginButton extends StatelessWidget {
         ),
       );
     });
+  }
+}
+
+/// Small picture of one section's sign-in design in the "My section" sheet.
+class _SectionChoice extends StatelessWidget {
+  const _SectionChoice({required this.level, required this.selected});
+
+  final String level;
+  final bool selected;
+
+  static const _labels = {'preprimary': 'Pre-primary', 'primary': 'Primary', 'secondary': 'Secondary'};
+  static const _colors = {
+    'preprimary': Color(0xFFF0287A),
+    'primary': Color(0xFF1D7FF0),
+    'secondary': Color(0xFFFF6A00),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colors[level]!;
+    final short = const {'preprimary': 'pre', 'primary': 'pri', 'secondary': 'sec'}[level];
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${_labels[level]} sign-in screen',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.pop(context, level),
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: selected ? color : const Color(0xFFE3E6EE), width: selected ? 3 : 1.5),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: AspectRatio(
+                  aspectRatio: 0.62,
+                  child: Image.asset('assets/login/bg_$short.webp',
+                      fit: BoxFit.cover, alignment: Alignment.topCenter, cacheWidth: 240),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(_labels[level]!,
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w500, color: selected ? color : _ink)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Big card on the "Choose your section" screen.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.level, required this.onTap});
+
+  final String level;
+  final VoidCallback onTap;
+
+  static const _labels = {'preprimary': 'Pre-primary', 'primary': 'Primary', 'secondary': 'Secondary'};
+  static const _classes = {'preprimary': 'Playgroup · Nursery · LKG · UKG', 'primary': 'Class 1 – 5', 'secondary': 'Class 6 and above'};
+  static const _colors = {
+    'preprimary': Color(0xFFF0287A),
+    'primary': Color(0xFF1D7FF0),
+    'secondary': Color(0xFFFF6A00),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colors[level]!;
+    final short = const {'preprimary': 'pre', 'primary': 'pri', 'secondary': 'sec'}[level];
+    return Semantics(
+      button: true,
+      label: '${_labels[level]}, ${_classes[level]}',
+      child: Material(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: color.withAlpha(70), width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 104,
+                height: 104,
+                child: Image.asset('assets/login/bg_$short.webp',
+                    fit: BoxFit.cover, alignment: const Alignment(0, -0.35), cacheWidth: 320),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_labels[level]!,
+                        style: GoogleFonts.fredoka(fontSize: 21, fontWeight: FontWeight.w600, color: color)),
+                    Text(_classes[level]!, style: GoogleFonts.poppins(fontSize: 13, color: _hint)),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: Icon(Icons.arrow_forward_rounded, color: color),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

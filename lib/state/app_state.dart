@@ -21,6 +21,7 @@ class AppState extends ChangeNotifier {
   static const _studentKey = 'school_student';
   static const _modeKey = 'school_mode';
   static const _levelKey = 'school_login_level';
+  static const _levelChosenKey = 'school_login_level_chosen';
   static const _rememberKey = 'school_remember';
   static const _savedLoginKey = 'school_saved_login';
 
@@ -35,6 +36,9 @@ class AppState extends ChangeNotifier {
 
   /// Sign-in design to show: 'preprimary', 'primary' or 'secondary' (the section of the last user).
   String? loginLevel;
+
+  /// True when the user picked the sign-in design on this phone (then sign-in does not change it).
+  bool loginLevelChosen = false;
   bool rememberMe = true;
   String savedLogin = '';
 
@@ -82,6 +86,7 @@ class AppState extends ChangeNotifier {
     selectedStudentId = prefs.getInt(_studentKey);
     mode = prefs.getString(_modeKey) ?? 'family';
     loginLevel = prefs.getString(_levelKey);
+    loginLevelChosen = prefs.getBool(_levelChosenKey) ?? false;
     rememberMe = prefs.getBool(_rememberKey) ?? true;
     savedLogin = prefs.getString(_savedLoginKey) ?? '';
     String? token;
@@ -175,6 +180,7 @@ class AppState extends ChangeNotifier {
 
   /// Section of the signed-in user, so the next sign-in screen uses the same design.
   Future<void> _rememberLevel() async {
+    if (loginLevelChosen) return; // the user picked a design on this phone
     String? level;
     if (showTeacher) {
       final teacher = me['teacher'] is Map ? me['teacher'] as Map : const {};
@@ -187,6 +193,20 @@ class AppState extends ChangeNotifier {
     loginLevel = level;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_levelKey, level);
+  }
+
+  /// Sign-in design picked on the sign-in screen; null goes back to automatic.
+  Future<void> setLoginLevel(String? level) async {
+    final prefs = await SharedPreferences.getInstance();
+    loginLevel = level;
+    loginLevelChosen = level != null;
+    if (level == null) {
+      await prefs.remove(_levelKey);
+    } else {
+      await prefs.setString(_levelKey, level);
+    }
+    await prefs.setBool(_levelChosenKey, loginLevelChosen);
+    notifyListeners();
   }
 
   Future<void> refreshMe() async {
