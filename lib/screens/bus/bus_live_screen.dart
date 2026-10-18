@@ -150,11 +150,17 @@ class _BusLiveScreenState extends State<BusLiveScreen> with WidgetsBindingObserv
             glide: Duration(milliseconds: (_interval * 900).clamp(1500, 9000)),
           ),
         ),
-        // top bar
-        SafeArea(
+        // top bar: pinned to the top, only as tall as its content
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+          bottom: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _BackButton(onTap: () => Navigator.maybePop(context)),
                 const SizedBox(width: 10),
@@ -163,6 +169,7 @@ class _BusLiveScreenState extends State<BusLiveScreen> with WidgetsBindingObserv
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: _cardDecoration(),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('${vehicle['name'] ?? 'School bus'} · ${route['name']}',
@@ -179,6 +186,7 @@ class _BusLiveScreenState extends State<BusLiveScreen> with WidgetsBindingObserv
                 ),
               ],
             ),
+          ),
           ),
         ),
         // map buttons

@@ -93,7 +93,8 @@ class ApiClient {
     } on http.ClientException catch (e) {
       throw ApiException('Connection problem: ${e.message}', code: 'network');
     } on HandshakeException {
-      throw ApiException('Secure connection failed. Check the server address (http/https).', code: 'network');
+      throw ApiException('Secure connection failed to $serverUrl. Check the server address (http/https).',
+          code: 'network');
     }
     dynamic payload;
     try {
