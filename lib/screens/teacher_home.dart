@@ -10,6 +10,7 @@ import 'preprimary/diary_teacher_screen.dart';
 import 'student/timetable_screen.dart';
 import 'bus/bus_crew_screens.dart';
 import 'teacher/attendance_take_screen.dart';
+import 'teacher/availability_screen.dart';
 import 'teacher/homework_teacher_screen.dart';
 import 'teacher/leave_approvals_screen.dart';
 import 'teacher/marks_screen.dart';
@@ -219,6 +220,12 @@ class _TeacherHomeState extends State<TeacherHome> {
                           color: AppColors.orange,
                           onTap: () => _open(const TimetableScreen(
                               path: '/teacher/timetable', title: 'My timetable', showSection: true))),
+                    if (state.hasFeature('timetable'))
+                      FeatureTile(
+                          icon: Icons.event_available_rounded,
+                          label: 'My Availability',
+                          color: AppColors.teal,
+                          onTap: () => _open(const AvailabilityScreen())),
                     if (state.hasFeature('staff'))
                       FeatureTile(
                           icon: Icons.badge_rounded,

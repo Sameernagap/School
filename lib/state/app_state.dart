@@ -51,11 +51,12 @@ class AppState extends ChangeNotifier {
   bool get isTeacher => roles.contains('teacher');
   bool get isFamily => isParent || isStudent;
 
-  /// Bus attendant / driver who runs trips in the app.
-  bool get isBusCrew => roles.contains('bus');
+  /// Bus attendant / driver who runs trips in the app (only when the school's plan has live bus tracking).
+  bool get isBusCrew => roles.contains('bus') && hasFeature('bus_live');
 
-  /// Bus staff without a parent, student or teacher role: the app opens on the bus trips.
-  bool get isBusOnly => isBusCrew && !isFamily && !isTeacher;
+  /// Bus staff without a parent, student or teacher role: the app opens on the bus trips
+  /// (which explain that live tracking is not in the plan when it is switched off).
+  bool get isBusOnly => roles.contains('bus') && !isFamily && !isTeacher;
   bool get canSwitchMode => isTeacher && isFamily;
   List<String> get features => List<String>.from(me['features'] ?? const []);
   bool hasFeature(String name) => features.contains(name);
